@@ -1,0 +1,2874 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>沃太家庭能源管家 Butler · 原型</title>
+<meta name="description" content="沃太家庭能源管家 Butler 交互原型：12 个页面、单文件、模拟数据。">
+<style>
+/* ============================================================
+   设计系统 · Minimalism / Swiss Style
+   黑 + 白 + 中性灰为主体，仅 1 个强调色（管家正在为你工作）
+   红 / 琥珀只用于语义告警 · 圆角 0–2px · 1px 实线分层 · 不使用投影与渐变
+   图标统一 20x20 / 1.5px 线宽 / 无填充 · 全文禁用 emoji
+   ============================================================ */
+:root{
+  --paper:#F5F5F3;
+  --surface:#FFFFFF;
+  --sunk:#EDEDEA;
+  --sunk-2:#E6E6E2;
+
+  --ink:#0E1116;        /* 16.9:1 on paper */
+  --ink-2:#4B5563;      /* 7.5:1  */
+  --ink-3:#6B7280;      /* 4.8:1  */
+  --ink-4:#9AA0A6;      /* 仅用于图形与分隔，不用于正文 */
+
+  --line:#E3E4E6;
+  --line-2:#C9CBCF;
+  --line-3:#9AA0A6;
+
+  --accent:#1D4ED8;     /* 6.3:1 on surface —— 唯一强调色 */
+  --accent-2:#1E40AF;
+  --accent-weak:#EEF2FE;
+
+  --warn:#B45309;       /* 4.9:1 */
+  --warn-weak:#FBF4E9;
+  --danger:#B42318;     /* 6.4:1 */
+  --danger-weak:#FBEDEB;
+  --ok:#15803D;
+
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,
+         "PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC",sans-serif;
+  --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+
+  --r:2px;
+  --r2:4px;
+
+  --z-base:0; --z-sticky:20; --z-rail:30; --z-drawer:50; --z-modal:70; --z-toast:90;
+  --sidebar-w:236px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--font);
+  font-size:15px;
+  line-height:1.6;
+  color:var(--ink);
+  background:var(--paper);
+  -webkit-font-smoothing:antialiased;
+  text-rendering:optimizeLegibility;
+}
+h1,h2,h3,h4{margin:0;font-weight:600;line-height:1.35}
+p{margin:0}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}
+table{border-collapse:collapse;width:100%}
+:focus-visible{outline:2px solid var(--ink);outline-offset:1px}
+[tabindex="-1"]:focus{outline:none}
+.num{font-variant-numeric:tabular-nums;font-feature-settings:"tnum" 1}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:8px;top:-48px;z-index:var(--z-modal);background:var(--surface);
+  border:1px solid var(--line-2);padding:8px 12px;transition:top .15s ease-out}
+.skip:focus{top:8px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- 骨架 ---------- */
+.app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;min-height:100dvh}
+.sidebar{
+  position:sticky;top:0;height:100dvh;background:var(--surface);
+  border-right:1px solid var(--line);display:flex;flex-direction:column;z-index:var(--z-rail);
+}
+.brand{height:56px;display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.brand-mark{width:20px;height:20px;flex:0 0 auto;color:var(--accent)}
+.brand-text{font-size:13px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.brand-ver{margin-left:auto;font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.nav{flex:1 1 auto;overflow-y:auto;padding:12px 0}
+.nav-group{padding:0 0 14px}
+.nav-title{font-size:11px;letter-spacing:.06em;color:var(--ink-3);padding:0 16px 6px}
+.nav-item{
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;
+  padding:8px 16px 8px 14px;border-left:2px solid transparent;color:var(--ink-2);
+  font-size:14px;transition:color .15s ease-out,background-color .15s ease-out;
+}
+.nav-item:hover{background:var(--sunk);color:var(--ink)}
+.nav-item.on{border-left-color:var(--accent);color:var(--accent);font-weight:500}
+.nav-item.on .ico{color:var(--accent)}
+.nav-item .ico{color:var(--ink-3);flex:0 0 auto}
+.nav-item .badge{margin-left:auto}
+.nav-item.attn{border-left-color:var(--warn)}
+.nav-foot{flex:0 0 auto;border-top:1px solid var(--line);padding:10px 12px}
+.role-switch{display:flex;flex-direction:column;gap:2px}
+.role-btn{display:flex;align-items:center;gap:8px;background:none;border:0;padding:7px 6px;font-size:13px;color:var(--ink-2);text-align:left}
+.role-btn .dot{width:6px;height:6px;border:1px solid var(--line-3);border-radius:50%;flex:0 0 auto}
+.role-btn.on{color:var(--ink);font-weight:500}
+.role-btn.on .dot{background:var(--accent);border-color:var(--accent)}
+.role-btn:hover{background:var(--sunk)}
+.nav-foot .fine{font-size:11px;color:var(--ink-3);padding:8px 6px 2px;border-top:1px solid var(--line);margin-top:6px}
+
+/* ---------- 顶栏 ---------- */
+.main{min-width:0;display:flex;flex-direction:column}
+.topbar{
+  position:sticky;top:0;z-index:var(--z-sticky);height:56px;background:var(--surface);
+  border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:0 20px;
+}
+.crumbs{display:flex;align-items:center;gap:8px;font-size:13px;min-width:0;flex:0 1 auto}
+.crumbs .sep{color:var(--ink-4)}
+.crumbs .cur{color:var(--ink);font-weight:500}
+.crumbs .prev{color:var(--ink-3)}
+.crumbs .app-name{font-size:13px;font-weight:600;letter-spacing:.02em}
+.modebar{
+  display:flex;align-items:center;gap:10px;height:32px;padding:0 10px 0 0;background:var(--surface);
+  border:1px solid var(--line-2);border-radius:var(--r);min-width:220px;max-width:460px;
+  text-align:left;overflow:hidden;
+}
+.modebar:hover{border-color:var(--ink-3)}
+.modebar .chip{width:8px;height:100%;background:var(--line-3);flex:0 0 auto}
+.modebar.s-shadow .chip{background:var(--ink-4)}
+.modebar.s-advisory .chip{background:var(--ink-2);outline:1px dashed var(--ink-2);outline-offset:-3px}
+.modebar.s-auto .chip{background:var(--accent)}
+.modebar.s-conservative .chip{background:var(--warn)}
+.modebar.s-safe .chip{background:var(--danger)}
+.modebar.s-manual-hold .chip{background:var(--danger)}
+.modebar .name{font-size:13px;font-weight:500;white-space:nowrap}
+.modebar .why{font-size:12px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .right{margin-left:auto;display:flex;align-items:center;gap:12px;flex:0 0 auto}
+.freshness{font-size:12px;color:var(--ink-3);white-space:nowrap;background:none;border:0;padding:4px 2px}
+.freshness:hover{color:var(--ink);text-decoration:underline}
+.freshness.stale{color:var(--warn)}
+.icon-btn{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;
+  background:none;border:1px solid transparent;border-radius:var(--r);color:var(--ink-2)}
+.icon-btn:hover{background:var(--sunk);border-color:var(--line);color:var(--ink)}
+.menu-wrap{position:relative}
+.menu{position:absolute;right:0;top:38px;min-width:250px;background:var(--surface);
+  border:1px solid var(--line-2);border-radius:var(--r);padding:4px;z-index:var(--z-drawer);display:none}
+.menu.open{display:block}
+.menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:9px 10px;
+  font-size:13px;border-radius:var(--r)}
+.menu button:hover{background:var(--sunk)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.menu .k{font-size:11px;color:var(--ink-3);padding:6px 10px 4px;letter-spacing:.04em}
+.menu .danger{color:var(--danger)}
+.proto{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink-3);
+  border:1px dashed var(--line-2);border-radius:var(--r);padding:3px 8px;white-space:nowrap}
+.proto b{color:var(--ink-2);font-weight:500}
+
+/* ---------- 内容 ---------- */
+.content{flex:1 1 auto;padding:24px 28px 72px;max-width:1240px;width:100%}
+.page-head{margin-bottom:20px}
+.page-head h1{font-size:26px;letter-spacing:-.01em;font-weight:600}
+.page-head .sub{margin-top:6px;font-size:14px;color:var(--ink-2);max-width:640px}
+.page-head .row{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.page-head .row .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.crumb-time{font-size:12px;color:var(--ink-3);margin-top:8px}
+
+.banner{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line-2);
+  border-left:4px solid var(--warn);background:var(--warn-weak);padding:11px 14px;
+  border-radius:var(--r);margin-bottom:16px}
+.banner.safe,.banner.manual{border-left-color:var(--danger);background:var(--danger-weak)}
+.banner.info{border-left-color:var(--accent);background:var(--accent-weak)}
+.banner.neutral{border-left-color:var(--line-3);background:var(--sunk)}
+.banner .bt{font-size:13px;font-weight:500}
+.banner .bd{font-size:13px;color:var(--ink-2);margin-top:2px}
+.banner .ba{margin-left:auto;flex:0 0 auto;display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.banner .cond{font-size:11px;color:var(--ink-3);text-align:right}
+
+/* 卡片 / 网格 */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card.pad0{padding:0}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.card-head h2{font-size:14px;font-weight:600}
+.card-head .meta{margin-left:auto;flex:0 0 auto;flex-wrap:wrap;justify-content:flex-end;font-size:11px;color:var(--ink-3);display:flex;align-items:center;gap:10px}
+.card-head .meta button{background:none;border:0;font-size:11px;color:var(--ink-3);padding:2px 0}
+.card-head .meta button:hover{color:var(--accent);text-decoration:underline}
+.card-note{font-size:12px;color:var(--ink-3);margin-top:8px}
+.sec{margin-bottom:20px}
+.sec > .sec-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sec > .sec-head h2{font-size:15px}
+.sec > .sec-head .meta{margin-left:auto;font-size:11px;color:var(--ink-3)}
+.c3{grid-column:span 4}.c4{grid-column:span 3}.c6{grid-column:span 6}
+.c8{grid-column:span 8}.c9{grid-column:span 9}.c12{grid-column:span 12}
+@media (max-width:1200px){.c3{grid-column:span 6}.c4{grid-column:span 6}.c8,.c9{grid-column:span 12}}
+
+/* 结论卡 */
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;
+  display:block;text-align:left;width:100%;transition:border-color .15s ease-out}
+button.stat:hover{border-color:var(--ink-3)}
+.stat .k{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.stat .v{font-size:30px;font-weight:600;letter-spacing:-.02em;margin-top:8px;line-height:1.1}
+.stat .v small{font-size:14px;font-weight:500;color:var(--ink-2);margin-left:2px}
+.stat .d{font-size:12px;color:var(--ink-2);margin-top:6px}
+.stat .d.warn{color:var(--warn)}
+.stat .d.good{color:var(--ok)}
+.stat.alert{border-left:3px solid var(--warn)}
+
+/* 徽标 */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;line-height:1;padding:4px 7px;
+  border:1px solid var(--line-2);border-radius:var(--r);color:var(--ink-2);white-space:nowrap;background:var(--surface)}
+.badge.acc{border-color:var(--accent);color:var(--accent);background:var(--accent-weak)}
+.badge.warn{border-color:var(--warn);color:var(--warn);background:var(--warn-weak)}
+.badge.danger{border-color:var(--danger);color:var(--danger);background:var(--danger-weak)}
+.badge.ok{border-color:var(--ok);color:var(--ok)}
+.badge.ghost{background:var(--sunk);border-color:var(--line)}
+.badge .dotm{width:5px;height:5px;border-radius:50%;background:currentColor}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:7px 14px;
+  border:1px solid var(--line-2);border-radius:var(--r);background:var(--surface);font-size:13px;
+  color:var(--ink);transition:background-color .15s ease-out,border-color .15s ease-out}
+.btn:hover{background:var(--sunk);border-color:var(--ink-3)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
+.btn.danger{color:var(--danger);border-color:var(--danger)}
+.btn.danger:hover{background:var(--danger-weak)}
+.btn.sm{min-height:28px;padding:4px 10px;font-size:12px}
+.btn.ghost{border-color:transparent;color:var(--ink-2);padding:6px 8px}
+.btn.ghost:hover{background:var(--sunk);color:var(--ink)}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.btn[disabled]:hover{background:var(--surface);border-color:var(--line-2)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.seg{display:inline-flex;flex:0 0 auto;border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden}
+.seg button{background:var(--surface);border:0;border-right:1px solid var(--line);padding:6px 12px;font-size:12px;color:var(--ink-2);white-space:nowrap}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--sunk);color:var(--ink);font-weight:500}
+.seg button:hover{color:var(--ink)}
+
+/* 表格 */
+.tbl{font-size:13px}
+.tbl th{text-align:left;font-weight:500;font-size:11px;letter-spacing:.04em;color:var(--ink-3);
+  padding:9px 12px;border-bottom:1px solid var(--line-2);white-space:nowrap;background:var(--surface)}
+.tbl td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tbody tr.clickable:hover{background:var(--sunk)}
+.tbl tbody tr.clickable{cursor:pointer}
+.tbl .r{text-align:right}
+.tbl .nowrap{white-space:nowrap}
+.tbl caption{text-align:left;font-size:12px;color:var(--ink-3);padding:0 12px 8px}
+.tbl-wrap{overflow-x:auto}
+.tbl-wrap table{min-width:560px}
+.pos{color:var(--ok)}
+.neg{color:var(--danger)}
+.dim{color:var(--ink-3)}
+.tiny{font-size:11px}
+.strong{font-weight:500}
+.mono{font-family:var(--mono);font-size:12px}
+
+/* 列表 */
+.list{border-top:1px solid var(--line)}
+.row{display:flex;gap:12px;align-items:flex-start;padding:12px 2px;border-bottom:1px solid var(--line)}
+.row.clickable{cursor:pointer}
+.row.clickable:hover{background:var(--sunk)}
+.row .t{font-size:12px;color:var(--ink-3);white-space:nowrap;min-width:96px}
+.row .b{flex:1 1 auto;min-width:0}
+.row .b .h{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.row .b .p{font-size:12px;color:var(--ink-2);margin-top:3px}
+.row .e{flex:0 0 auto;text-align:right}
+.row .e .v{font-size:13px;font-weight:500}
+.row .e .m{font-size:11px;color:var(--ink-3)}
+
+/* 定义列表 */
+.dl{display:grid;grid-template-columns:auto 1fr;gap:8px 16px;font-size:13px}
+.dl dt{color:var(--ink-3)}
+.dl dd{margin:0;font-weight:500}
+.kv{display:flex;justify-content:space-between;gap:12px;font-size:13px;padding:7px 0;border-bottom:1px solid var(--line)}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--ink-3)}
+.kv .v{font-weight:500;text-align:right}
+
+/* 深水区 */
+details.deep{border:1px solid var(--line);border-radius:var(--r);background:var(--surface);margin-top:12px}
+details.deep > summary{cursor:pointer;padding:10px 14px;font-size:12px;color:var(--ink-2);list-style:none;
+  display:flex;align-items:center;gap:8px}
+details.deep > summary::-webkit-details-marker{display:none}
+details.deep > summary::before{content:"";width:12px;height:12px;flex:0 0 auto;
+  background:
+    linear-gradient(currentColor,currentColor) center/12px 1.5px no-repeat,
+    linear-gradient(currentColor,currentColor) center/1.5px 12px no-repeat;}
+details.deep[open] > summary::before{
+  background:linear-gradient(currentColor,currentColor) center/12px 1.5px no-repeat}
+details.deep > summary:hover{color:var(--ink)}
+details.deep .deep-body{padding:2px 14px 14px;border-top:1px solid var(--line)}
+
+/* 状态块（加载/空/降级/权限 共用） */
+.stateblock{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;padding:48px 24px;gap:10px}
+.stateblock .ico{color:var(--ink-4)}
+.stateblock h3{font-size:15px;font-weight:500}
+.stateblock p{font-size:13px;color:var(--ink-3);max-width:420px}
+.stateblock .btn{margin-top:6px}
+.skel{display:flex;flex-direction:column;gap:10px;padding:4px 0}
+.skel i{display:block;background:var(--sunk);border-radius:var(--r)}
+.skel .l1{height:32px}.skel .l2{height:24px}.skel .l2.w70{width:70%}
+.skel .box120{height:120px}.skel .box64{height:64px}.skel .box200{height:200px}.skel .box240{height:240px}
+.skel .rowline{height:32px}.skel .row48{height:48px}
+.skel .hint{font-size:12px;color:var(--ink-3);text-align:center;padding-top:6px}
+
+/* 时间线 */
+.tl{position:relative;margin:4px 0 0;padding:0 0 0 18px;border-left:1px solid var(--line-2);list-style:none}
+.tl li{position:relative;padding:0 0 16px}
+.tl li:last-child{padding-bottom:0}
+.tl li::before{content:"";position:absolute;left:-23px;top:6px;width:9px;height:9px;border-radius:50%;
+  background:var(--surface);border:1.5px solid var(--line-3)}
+.tl li.done::before{background:var(--ink-2);border-color:var(--ink-2)}
+.tl li.now::before{background:var(--accent);border-color:var(--accent)}
+.tl li.agent::before{border-color:var(--accent)}
+.tl .tt{font-size:11px;color:var(--ink-3);letter-spacing:.02em}
+.tl .th{font-size:13px;font-weight:500;margin-top:1px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.tl .tp{font-size:12px;color:var(--ink-2);margin-top:2px}
+
+/* 图表 */
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.chart .axis{stroke:var(--line-2);stroke-width:1}
+.chart .gridline{stroke:var(--line);stroke-width:1}
+.chart .lbl{font-size:10px;fill:var(--ink-3);font-family:var(--font)}
+.chart .bar{fill:var(--sunk-2)}
+.chart .bar.hot{fill:var(--accent)}
+.chart .bar.warn{fill:var(--warn)}
+.chart .line{fill:none;stroke:var(--ink-2);stroke-width:1.5}
+.chart .line.accent{stroke:var(--accent)}
+.chart .line.dashed{stroke-dasharray:4 3;stroke:var(--ink-4)}
+.chart .area{fill:var(--sunk);stroke:none}
+.chart .band{fill:var(--accent-weak)}
+.chart .band.warn{fill:var(--warn-weak)}
+.chart .mk{fill:var(--surface);stroke:var(--ink-2);stroke-width:1.5}
+.chart .mk.accent{stroke:var(--accent)}
+.chart .hit{fill:transparent;cursor:pointer}
+.chart .hit:hover + .band,.chart .hit:hover ~ .hl{fill:var(--sunk)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:11px;color:var(--ink-3);margin-top:10px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:14px;height:8px;display:inline-block;border:1px solid var(--line-2);background:var(--surface)}
+.legend i.b{background:var(--sunk-2);border-color:var(--line-2)}
+.legend i.a{background:var(--accent);border-color:var(--accent)}
+.legend i.w{background:var(--warn);border-color:var(--warn)}
+.legend i.l{border:0;border-top:2px solid var(--ink-2);height:0}
+.legend i.d{border:0;border-top:2px dashed var(--ink-4);height:0}
+
+/* 能量流 */
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.flow .node{border:1px solid var(--line);border-radius:var(--r);padding:14px;background:var(--surface);
+  text-align:left;display:block;width:100%}
+.flow .node:hover{border-color:var(--ink-3)}
+.flow .node .n{font-size:12px;color:var(--ink-3);display:flex;align-items:center;gap:6px}
+.flow .node .p{font-size:22px;font-weight:600;margin-top:8px;letter-spacing:-.01em}
+.flow .node .p small{font-size:12px;color:var(--ink-3);font-weight:400;margin-left:3px}
+.flow .node .f{font-size:12px;color:var(--ink-2);margin-top:4px}
+@media (max-width:768px){.flow{grid-template-columns:repeat(2,1fr)}}
+
+/* 三条轨（计划图） */
+.track{display:flex;align-items:flex-end;gap:1px;height:120px}
+.track .col{flex:1 1 0;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;height:100%}
+.track .col i{display:block;background:var(--sunk-2);border-radius:1px}
+.track .col i.pv{background:#B9C4CE}
+.track .col i.bat{background:var(--ink-2)}
+.track .col i.hot{background:var(--accent)}
+.track .col:hover i{background:var(--ink-3)}
+.track-x{display:flex;gap:1px;font-size:10px;color:var(--ink-3);margin-top:6px}
+.track-x span{flex:1 1 0;text-align:left}
+
+/* 进度 / 比例 */
+.bar{height:8px;background:var(--sunk-2);border-radius:var(--r);overflow:hidden}
+.bar > i{display:block;height:100%;background:var(--ink-2)}
+.bar > i.acc{background:var(--accent)}
+.bar > i.warn{background:var(--warn)}
+.bar > i.danger{background:var(--danger)}
+.bar.lg{height:12px}
+.slider{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.slider:last-child{border-bottom:0}
+.slider .k{width:120px;font-size:13px;color:var(--ink-2);flex:0 0 auto}
+.slider input[type=range]{flex:1 1 auto;accent-color:var(--accent)}
+.slider .v{width:64px;text-align:right;font-size:13px;font-weight:500;flex:0 0 auto}
+
+/* 表单 */
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field > label{font-size:13px;font-weight:500}
+.field .help{font-size:12px;color:var(--ink-3)}
+input[type=text],input[type=search],select,textarea{
+  font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line-2);border-radius:var(--r);
+  background:var(--surface);color:var(--ink);min-height:36px;width:100%}
+input:hover,select:hover{border-color:var(--ink-3)}
+input:focus,select:focus{outline:2px solid var(--ink);outline-offset:0;border-color:var(--ink)}
+.radio{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line-2);border-radius:var(--r);
+  padding:12px;cursor:pointer;background:var(--surface);margin-bottom:8px}
+.radio:hover{border-color:var(--ink-3)}
+.radio.on{border-color:var(--accent);background:var(--accent-weak)}
+.radio input{margin:3px 0 0;accent-color:var(--accent);flex:0 0 auto}
+.radio .rt{font-size:13px;font-weight:500}
+.radio .rd{font-size:12px;color:var(--ink-2);margin-top:2px}
+.chk{all:unset;display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding:4px 0}
+.chk::before{content:"";width:14px;height:14px;border:1px solid var(--line-2);border-radius:1px;flex:0 0 auto;background:var(--surface)}
+.chk[aria-pressed=true]::before{background:var(--accent);border-color:var(--accent);
+  box-shadow:inset 0 0 0 2px var(--surface)}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.filters .sp{margin-left:auto}
+
+/* 抽屉 */
+.scrim{position:fixed;inset:0;background:rgba(14,17,22,.42);z-index:var(--z-drawer);display:none}
+.scrim.open{display:block}
+.drawer{position:fixed;top:0;right:0;height:100dvh;width:420px;max-width:100vw;background:var(--surface);
+  border-left:1px solid var(--line-2);z-index:var(--z-modal);transform:translateX(100%);
+  transition:transform .2s ease-out;display:flex;flex-direction:column}
+.drawer.open{transform:translateX(0)}
+.drawer .dhead{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+.drawer .dhead h3{font-size:14px}
+.drawer .dbody{padding:18px;overflow-y:auto;flex:1 1 auto}
+.drawer .dfoot{padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:8px}
+@media (max-width:768px){
+  .drawer{top:auto;bottom:0;right:0;left:0;width:auto;height:60dvh;border-left:0;border-top:1px solid var(--line-2);
+    transform:translateY(100%)}
+  .drawer.open{transform:translateY(0)}
+}
+
+/* 全屏确认页 */
+.fullpage{position:fixed;inset:0;background:var(--paper);z-index:var(--z-modal);overflow-y:auto;display:none}
+.fullpage.open{display:block}
+.fullpage .fp-inner{max-width:680px;margin:0 auto;padding:48px 24px 96px}
+.fullpage h2{font-size:22px;margin-bottom:8px}
+.fullpage .lead{font-size:14px;color:var(--ink-2);margin-bottom:24px}
+.fp-sec{border-top:1px solid var(--line);padding:18px 0}
+.fp-sec h4{font-size:13px;color:var(--ink-3);font-weight:500;margin-bottom:6px}
+.fp-sec p{font-size:14px}
+.fp-actions{display:flex;gap:10px;margin-top:24px;align-items:center}
+
+/* 浮层 / 提示 */
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:var(--z-toast);
+  background:var(--ink);color:#fff;font-size:13px;padding:10px 16px;border-radius:var(--r);display:none;max-width:90vw}
+.toast.open{display:block}
+.toast button{background:none;border:0;color:#fff;text-decoration:underline;margin-left:10px}
+
+/* 移动端 */
+.mobile-bar{display:none}
+@media (max-width:1023px){
+  .app{grid-template-columns:64px 1fr}
+  .brand-text,.nav-item span.lbl,.nav-title,.nav-foot .role-switch span.lbl,.nav-foot .fine{display:none}
+  .brand{padding:0;justify-content:center}
+  .brand-ver{display:none}
+  .nav-item{padding:10px 0;justify-content:center}
+  .nav-item .badge{display:none}
+  .nav-item .ico{margin:0}
+  .role-btn{padding:8px 0;justify-content:center}
+  .role-btn .dot{margin:0}
+  .content{padding:20px 18px 72px}
+  .modebar .why{display:none}
+}
+@media (max-width:768px){
+  .app{grid-template-columns:1fr}
+  .sidebar{display:none}
+  .content{padding:16px 14px 96px}
+  .topbar{padding:0 12px;gap:10px}
+  .proto{display:none}
+  .c3,.c4,.c6,.c8,.c9{grid-column:span 12}
+  .mobile-bar{display:flex;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surface);
+    border-top:1px solid var(--line);z-index:var(--z-rail);padding-bottom:env(safe-area-inset-bottom)}
+  .mobile-bar button{flex:1 1 0;background:none;border:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:3px;font-size:10px;color:var(--ink-3)}
+  .mobile-bar button.on{color:var(--accent)}
+  .tbl-wrap table{min-width:0}
+  .tbl thead{display:none}
+  .tbl tr{display:block;border-bottom:1px solid var(--line);padding:10px 0}
+  .tbl td{display:block;border:0;padding:2px 0}
+  .tbl td::before{content:attr(data-k) "：";color:var(--ink-3);font-size:11px}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">跳到主要内容</a>
+
+<div class="app">
+  <aside class="sidebar" aria-label="主导航">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <rect x="3" y="4" width="14" height="12"/><path d="M6 12l2.5-3 2.5 2 3-4"/>
+      </svg>
+      <span class="brand-text">沃太家庭能源管家</span>
+      <span class="brand-ver">v2.0</span>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="nav-foot">
+      <div class="role-switch" id="roleSwitch" role="group" aria-label="角色切换"></div>
+      <div class="fine">数据口径说明 · <a href="#/settings" data-goto="settings-about">设置</a></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="crumbs" id="crumbs"></div>
+      <button class="modebar" id="modebar" title="查看权限分级"></button>
+      <div class="right">
+        <span class="proto" id="protoStamp">模拟数据 · <b id="protoToday"></b></span>
+        <button class="freshness" id="freshness"></button>
+        <button class="icon-btn menu-wrap" id="overflowBtn" aria-haspopup="true" aria-expanded="false" aria-label="更多操作">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+            <circle cx="10" cy="4.5" r="1"/><circle cx="10" cy="10" r="1"/><circle cx="10" cy="15.5" r="1"/>
+          </svg>
+        </button>
+        <div class="menu" id="overflowMenu" role="menu">
+          <button class="danger" data-act="factory-reset" role="menuitem">一键回退出厂策略</button>
+          <hr>
+          <div class="k">跳到</div>
+          <button data-goto="today" role="menuitem">今日 · g t</button>
+          <button data-goto="plan" role="menuitem">计划 · g p</button>
+          <button data-goto="decisions" role="menuitem">决策 · g d</button>
+          <button data-goto="incidents" role="menuitem">异常 · g i</button>
+          <hr>
+          <button data-act="shortcuts" role="menuitem">键盘快捷键 · ?</button>
+          <button data-act="reload-data" role="menuitem">重置模拟数据</button>
+        </div>
+      </div>
+    </header>
+    <main class="content" id="main" tabindex="-1"></main>
+  </div>
+</div>
+
+<nav class="mobile-bar" id="mobileBar" aria-label="分区导航"></nav>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-label="详情" hidden></aside>
+<div class="fullpage" id="fullpage" role="dialog" aria-modal="true" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ============================================================================
+   沃太家庭能源管家 Butler · 原型 · 单文件
+   全部为模拟数据，不接入真实电价 / 天气 / 设备（种子固定，刷新结果一致）
+   口径：2026-06-17 为原型"今天"；金额为欧元；正文不使用 SOC / DoD / EFC / kW / kWh
+   ============================================================================ */
+
+/* ---------- 固定种子伪随机（保证刷新数据一致） ---------- */
+function lcg(seed){let s=seed>>>0;return function(){s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
+
+/* ---------- 时间与格式 ---------- */
+const T = {
+  today:'2026-06-17', todayLabel:'06-17',
+  tomorrow:'2026-06-18',
+  tomorrowLabel:'06-18',
+  nowISO:'2026-06-17T18:24:00+02:00',
+  joinedAt:'2025-03-04'
+};
+const WEEK = ['周日','周一','周二','周三','周四','周五','周六'];
+function dparse(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);}
+function weekday(s){return WEEK[dparse(s).getDay()];}
+function daysBetween(a,b){return Math.round((dparse(b)-dparse(a))/86400000);}
+function daysAgoLabel(date){const n=daysBetween(date,T.today);return n===0?'今天':n===1?'昨天':n+' 天前';}
+function eur(v,opt){opt=opt||{};const s=Math.abs(v).toFixed(2);
+  if(opt.sign&&v>0)return '+€'+s; if(v<0)return '−€'+s; return '€'+s;}
+function pct(v,d){return v.toFixed(d===undefined?1:d)+'%';}
+function clockNow(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function minutesAgo(hhmm){
+  const [h,m]=hhmm.split(':').map(Number);const now=new Date();
+  let diff=(now.getHours()*60+now.getMinutes())-(h*60+m); if(diff<0)diff+=1440; return diff;
+}
+function freshLabel(hhmm){
+  const t=minutesAgo(hhmm);
+  if(t<=1)return '刚刚'; if(t<60)return t+' 分钟前';
+  return Math.floor(t/60)+' 小时前';
+}
+
+/* ============================================================================
+   1 · 数据层
+   ============================================================================ */
+const SIM = {
+  household:{ id:'HH-DE-00417', name:'Karlsruhe 一户四口', city:'Karlsruhe', members:4,
+    joinedAt:T.joinedAt, sinceDays:daysBetween(T.joinedAt,T.today), authorized:true },
+  site:{ pvKwp:8.4, batteryKwh:10.2, inverterKw:5.0, fw:'V1.42.7', batterySerial:'WT-BAT-1020-4471',
+    installedAt:'2025-02-18', installer:'Solarwerk Süd GmbH' },
+  tariff:{ product:'动态小时电价', retailer:'Stadtwerke Muster', until:'2027-03-31',
+    exportEur:0.078, feeKind:'分时输配电价' },
+  mode:{ value:'auto', since:'2026-06-17T06:10:00+02:00', reason:null,
+    owner:null },
+  conclusion:{ netEur:[1.86,2.40], backupHours:9, cyclesToday:0.42, monthUsedEfc:28.6,
+    monthBudgetEfc:50, monthPct:57.2 },
+  battery:{ soc:62.4, tempC:26.1, cellDeltaC:1.4, soh:97.4, healthPct:96.2,
+    minSocToday:38.1, cyclesYear:214.8, cyclesYearBudget:600, lifeYears:11,
+    reserveHours:4, reserveSoc:35, warrantyEfc:6000 },
+  flow:{ pv:3.40, grid:-1.10, battery:0.60, home:1.70 },
+  profile:{
+    observedDays:469, patterns:12, updatedAt:'2026-06-17',
+    facts:[
+      {k:'住几口人',v:'4 人（2 位成人、2 位学龄儿童）'},
+      {k:'起床时间',v:'工作日 06:20 前后，周末 08:10 前后'},
+      {k:'回家时间',v:'工作日 17:30 前后'},
+      {k:'是否在家办公',v:'每周约 2 天'},
+      {k:'是否装了电动车充电桩',v:'是，2025-09 安装'}
+    ],
+    guesses:[
+      {k:'每周洗几次衣服',v:'4–5 次，集中在周末白天',conf:0.86},
+      {k:'洗碗机用得多不多',v:'每周 6 次，多在 20:00 之后启动',conf:0.79},
+      {k:'家里有人怕冷吗',v:'冬天 11 月至 2 月取暖用得多，其余月份很少',conf:0.91},
+      {k:'夏天开空调吗',v:'很少，7–8 月约有 9 天全天开',conf:0.62},
+      {k:'会不会在意半夜的噪音',v:'会。2026-06-13 你为了安静推翻了一次夜间充电',conf:0.95},
+      {k:'周末白天通常在不在家',v:'半数周末白天在家',conf:0.58},
+      {k:'泳池泵是否常年运行',v:'5–9 月运行，每天约 6 小时',conf:0.88}
+    ]
+  },
+  loads:[
+    {name:'电动车充电桩',power:'最高 11 度/小时',daily:'0–38 度，看当天是否充电',shift:'可挪动，夜间或午间都能用'},
+    {name:'热泵（采暖与热水）',power:'平均 1.2 度/小时',daily:'4–14 度（冬季高）',shift:'可挪动 1–3 小时'},
+    {name:'洗碗机',power:'0.9 度/小时',daily:'1.1 度/次',shift:'可挪动，任意时段'},
+    {name:'洗衣机',power:'1.4 度/小时',daily:'0.9 度/次',shift:'可挪动，避开静默时段'},
+    {name:'烘干机',power:'2.4 度/小时',daily:'1.8 度/次',shift:'可挪动'},
+    {name:'泳池泵',power:'0.7 度/小时',daily:'4.2 度（5–9 月）',shift:'可挪动，白天优先'}
+  ],
+  solar:{ peakToday:'12:30 前后', eastWest:'东西向双坡，早 8 点与晚 6 点各有一个小峰',
+    seasons:[
+      {name:'夏（6–8 月）',gen:'28–42 度/日',note:'午后余电最多，上网收益主要来源'},
+      {name:'春（3–5 月）',gen:'14–30 度/日',note:'波动最大，预报误差常超 30%'},
+      {name:'秋（9–11 月）',gen:'7–19 度/日',note:'10 月起明显回落'},
+      {name:'冬（12–2 月）',gen:'1–6 度/日',note:'基本靠夜间存电，我不做激进套利'}
+    ],
+    confidence:0.72
+  },
+  outage:{ riskLevel:'中低',
+    history:[
+      {at:'2026-06-09 18:42',dur:'47 分钟',cause:'区域电网故障'},
+      {at:'2026-02-11 09:05',dur:'12 分钟',cause:'计划检修'},
+      {at:'2025-11-03 21:18',dur:'26 分钟',cause:'风暴导致线路跳闸'},
+      {at:'2025-03-04 07:40',dur:'4 分钟',cause:'并网调试'}
+    ],
+    note:'近 3 年该片区平均每 12 个月停电 1.8 次，且集中在冬季风暴季' },
+
+  /* 电价 · 2026-06-18（明日计划用） */
+  priceTomorrow:[
+    /* 0    1     2     3     4     5     6     7     8     9    10    11 */
+    0.19,0.17,0.15,0.14,0.15,0.19,0.27,0.34,0.31,0.24,0.15,0.06,
+    /*12    13    14    15    16    17    18    19    20    21    22    23 */
+    -0.02,0.01,0.09,0.18,0.29,0.42,0.51,0.47,0.38,0.29,0.24,0.21
+  ],
+  feeByHour:(function(){const a=new Array(24);
+    for(let h=0;h<24;h++){ a[h]= (h>=6&&h<9)?0.14 : (h>=16&&h<21)?0.16 : (h>=9&&h<16)?0.08 : 0.06; }
+    return a;})(),
+  priceToday:[
+    0.18,0.16,0.14,0.13,0.14,0.18,0.26,0.33,0.30,0.22,0.14,0.05,
+    -0.01,0.00,0.08,0.17,0.28,0.41,0.49,0.46,0.37,0.28,0.23,0.20
+  ],
+  pvTomorrow:[
+    0,0,0,0,0,0.3,1.2,2.6,4.0,5.2,6.0,6.3,6.1,5.4,4.2,2.9,1.6,0.6,0.1,0,0,0,0,0
+  ],
+  loadTomorrow:[
+    0.35,0.34,0.33,0.33,0.36,0.52,0.95,1.05,0.82,0.62,0.58,0.66,
+    0.74,0.70,0.62,0.66,0.88,1.10,1.24,1.18,1.02,0.86,0.62,0.44
+  ],
+
+  /* 明日计划动作 */
+  planSlots:[
+    {from:'02:00',to:'04:30',kind:'grid-charge',label:'从电网存电',detail:'存 4.4 度，留给早上和晚峰用',
+      expectedEur:0.52, efc:0.43, source:'电价与电网费一起算，夜里这段最便宜'},
+    {from:'11:30',to:'13:30',kind:'solar-use',label:'午间余电自用与上网',detail:'优先喂给热水和泳池泵，剩下的上网',
+      expectedEur:0.28, efc:0.08, source:'中午电价会走到负值，上网比存电划算'},
+    {from:'17:30',to:'20:30',kind:'discharge',label:'晚峰放电',detail:'放电 5.1 度，覆盖做饭与热水',
+      expectedEur:0.86, efc:0.50, source:'晚峰是全天最贵的一段'},
+    {from:'23:00',to:'23:45',kind:'hold',label:'不动作',detail:'电价回落但还没到便宜的位置，留到凌晨',
+      expectedEur:0, efc:0, source:'夜里 02:00 之后更便宜'}
+  ],
+  forgone:[
+    {window:'12:00–13:00 存电，再在 15:00–16:00 用掉', kind:'below-threshold', earn:0.16,
+     reason:'赚的是毛利 €0.16，扣掉来回损耗和电池损耗之后其实是亏 €0.11。为这点钱多跑一次循环不值得，电池我今天留着。'},
+    {window:'20:00–21:00 再多放 1.2 度', kind:'backup-edge', earn:0.42,
+     reason:'这一段电价确实贵，但再放下去，明天早上的备电会掉到 3 小时以下，低于你设的 4 小时底线。我不做。'},
+    {window:'16:00–17:00 存电', kind:'grid-fee-conflict', earn:0.07,
+     reason:'零售电价在这个小时看着便宜，但输配电费这个时段是全天最高的，两样加起来比夜里贵 €0.078。我改到夜里再存。'}
+  ],
+  revisions:[
+    {at:'14:05', what:'把 17:30 的放电起始时间从 17:00 推迟到 17:30',
+     why:'下午的云比预报厚，光伏比预计少发了 1.2 度，晚一点放能少买一点电'},
+    {at:'09:40', what:'取消 10:00–11:00 的一次小幅存电',
+     why:'电网费在这个时段上调了，价差从 €0.17 掉到 €0.11，低于你的门槛'}
+  ],
+  planConfidence:{ level:'中', value:0.72,
+    note:'明天下午的云量预报分歧较大。收益区间因此放宽到 €1.40–2.20，最坏情况也不会亏。',
+    weak:'14:00–16:00 这个时段判断不可靠' },
+
+  /* 决策日志 */
+  decisions:[
+    {id:'D-20260617-004', at:'17:30', date:T.today, action:'discharge', actionLabel:'晚峰放电',
+      result:'running', resultLabel:'执行中', impactEur:0.86, mode:'auto',
+      summary:'趁 17:30 之后电价最高的两个小时放电，覆盖做饭和热水。',
+      l1:'晚峰是全天最贵的一段，我让电池顶上去。',
+      l2:'这两个小时零售电价加电网费是全天最高的，放电比从电网买电省 €0.86。放电量 5.1 度，能把你晚间的用电全部盖住，同时电量仍保持在备电底线之上。',
+      l3:'我同时比对了三种做法：什么都不做（买电）、只放到 40% 就停（省 €0.54）、放到 30%（省 €1.02 但明早备电只剩 2.5 小时）。我选的是第二种和第三种之间，取 9 小时备电。',
+      evidence:['电价曲线：17:30 0.41、18:30 0.49 欧元/度','电网费：17:00–21:00 为全天最高的 0.16','画像：这户 18:00–20:30 是晚高峰']},
+    {id:'D-20260617-003', at:'11:40', date:T.today, action:'export', actionLabel:'余电上网',
+      result:'executed', resultLabel:'已执行', impactEur:0.14, mode:'auto',
+      summary:'中午的余电没地方放，直接上网，比硬存进电池划算。',
+      l1:'中午的电不发出去就浪费了。',
+      l2:'11:30 到 13:30 这段，发电超过家里消耗，电池也快满了。上网价 €0.078/度，存进去晚上再用相当于只赚 €0.06/度，因为要扣一次往返损耗。',
+      l3:'理论最优是把热水器调到这个时段，多消纳 1.1 度；但今天家里没人，做不到。', evidence:['上网结算价 €0.078/度','12:00 零售电价 €−0.02（负值）']},
+    {id:'D-20260617-002', at:'12:00', date:T.today, action:'skip', actionLabel:'放弃一次小套利',
+      result:'forgone', resultLabel:'主动放弃', impactEur:0, mode:'auto',
+      summary:'赚 €0.16 毛利、亏 €0.11 净利的事，我停掉了。',
+      l1:'为这点钱多跑一次循环不值得。',
+      l2:'这是全天最便宜的一小时，但价差只有 €0.13，低于你设的 €0.15 门槛。加上往返损耗和电池折旧，净收益是 −€0.11。',
+      l3:'门槛是你 2026-04-02 在协作页确认过的值。你可以随时改，改了我就跟着变。',
+      evidence:['价差 €0.13 / 门槛 €0.15','往返效率 0.90','折旧 0.105 欧元/度']},
+    {id:'D-20260617-001', at:'02:10', date:T.today, action:'grid-charge', actionLabel:'夜间存电',
+      result:'executed', resultLabel:'已执行', impactEur:0.38, mode:'auto',
+      summary:'凌晨电价最低，我存了 4.2 度电准备白天用。',
+      l1:'凌晨的电最便宜，我提前买好了。',
+      l2:'02:10–04:40 零售电价 €0.15、电网费 €0.06，合计 €0.21；今天 17:30 之后合计 €0.58。价差 €0.37，扣掉损耗与折旧净赚 €0.38。',
+      l3:'我没有选 00:00 就开始充，因为那时电价还是 €0.18；也没有拖到 05:00，那时光伏快起来了，充了也用不上。',
+      evidence:['02:00 合计电价 €0.21','17:00 合计电价 €0.58','预计收益 €0.41 · 实际 €0.38']},
+    {id:'D-20260616-005', at:'19:10', date:'2026-06-16', action:'discharge', actionLabel:'晚峰放电',
+      result:'executed', resultLabel:'已执行', impactEur:0.79, mode:'auto',
+      summary:'和今天同样的做法，昨天实际省了 €0.79，比预计少 4 分。',
+      l1:'晚峰放电，实际和预计差 4 分钱。',
+      l2:'预计 €0.83、实际 €0.79，差在晚间的用电比画像估计多了 0.6 度。',
+      l3:'偏差在正常范围内，我没有因此调整画像权重。', evidence:['预计 €0.83 · 实际 €0.79']},
+    {id:'D-20260613-003', at:'01:00', date:'2026-06-13', action:'grid-charge', actionLabel:'夜间存电 3.2 度',
+      result:'overridden', resultLabel:'被你推翻', impactEur:-0.16, mode:'auto',
+      summary:'你推翻了这次夜间充电，实际比预计少赚 €0.16。',
+      l1:'这一条你不同意，我记下来了。',
+      l2:'我原本打算 01:00–03:00 存 3.2 度电，预期收益 €0.34。你在 07:20 推翻了它，理由是"半夜充电有声音，影响睡觉"。实际收益 €0.18。',
+      l3:'我后续不再在你设定的静默时段（23:00–07:00）安排充电。这条规则已经写进偏好，不需要你每次再说。',
+      evidence:['推翻人：户主','推翻时间：2026-06-13 07:20','范围：就这一次'],
+      overridden:{by:'户主', at:'2026-06-13 07:20', reason:'半夜充电有声音，影响睡觉', scope:'once'},
+      outcome:{actualEur:0.18, predictedEur:0.34, delta:-0.16}},
+    {id:'D-20260612-002', at:'16:20', date:'2026-06-12', action:'skip', actionLabel:'降级后暂停动作',
+      result:'degraded', resultLabel:'已降级', impactEur:0, mode:'conservative',
+      summary:'那天电价数据断过一次，我切到保守，只保证自发自用。',
+      l1:'拿不到电价，我就按最保险的方式走。',
+      l2:'16:20 起电价源没有更新，持续 38 分钟。我停止一切套利，只做自发自用和备电保障。',
+      l3:'这段时间你少赚了约 €0.22。我认为这个代价比用过期价格去交易要小。', evidence:['降级时长 38 分钟','少赚约 €0.22']},
+    {id:'D-20260610-003', at:'03:00', date:'2026-06-10', action:'grid-charge', actionLabel:'夜间存电 4.0 度',
+      result:'executed', resultLabel:'已执行', impactEur:0.44, mode:'auto',
+      summary:'凌晨存了 4 度，当天晚峰用掉，净赚 44 分。',
+      l1:'同样的一进一出，赚了 44 分。',
+      l2:'凌晨合计 €0.20，晚峰合计 €0.55。', l3:'当天光伏预报不准，我多存了 0.6 度作为缓冲。',
+      evidence:['凌晨 €0.20 · 晚峰 €0.55']},
+    {id:'D-20260608-001', at:'10:00', date:'2026-06-08', action:'skip', actionLabel:'放弃中午放电',
+      result:'forgone', resultLabel:'主动放弃', impactEur:0, mode:'auto',
+      summary:'那天光伏预报分歧很大，我承认我不确定，就没动。',
+      l1:'我不知道中午会不会有余电，所以没安排。',
+      l2:'四种天气预报里有两种说中午有云、两种说晴。差别是 3.8 度电。我没有把握，就放弃了这个时段。',
+      l3:'我选择承认不知道，而不是按平均值赌一把。', evidence:['预报分歧 3.8 度','四源中 2 源报晴'],
+      uncertaintyDeclared:'今天的光伏预报差异很大，我不确定中午会不会有足够余电，所以放弃了中午的放电安排，改成最保守的做法。'},
+    {id:'D-20260522-002', at:'14:10', date:'2026-05-22', action:'discharge', actionLabel:'下午放电',
+      result:'takenover', resultLabel:'人工接管', impactEur:0.12, mode:'manual-hold',
+      summary:'安装商远程暂停了这次放电，因为电池单体温度偏高。',
+      l1:'有人接管了这次动作，我停手了。',
+      l2:'安装商 Solarwerk Süd GmbH 的 T. Bauer 在 14:10 远程暂停下午的放电安排。原因：电池单体温度偏高，现场确认是通风口被遮挡。',
+      l3:'在人工接管期间我不做任何动作。解除接管后我恢复正常调度，并把这次事件关联到异常记录。',
+      evidence:['接管人：T. Bauer','接管时间：2026-05-22 14:10'],
+      takenOver:{by:'Solarwerk Süd GmbH / T. Bauer', at:'2026-05-22 14:10',
+        note:'电池单体温度偏高，远程暂停了下午的放电安排，已确认是通风口被遮挡'}}
+  ],
+
+  /* 异常事件 */
+  incidents:[
+    {id:'INC-20260609-001', at:'2026-06-09 18:42', date:'2026-06-09', level:'L3', status:'closed',
+      title:'区域电网故障停电 47 分钟', owner:'业主 + 安装商', whoDecides:'user', recovery:'已恢复，我在观察',
+      briefing:{what:'2026-06-09 18:42，片区电网故障导致停电，持续 47 分钟。',
+        when:'2026-06-09 18:42 – 19:29',
+        who:'业主（现场确认）、沃太售后（远程）、Solarwerk Süd GmbH（远程）',
+        impact:'家里用电全程未中断。少的收益 €0.42（这段时间原本能放电和上网）。',
+        decision:'我自动切到离网供电并进入安全模式，人工确认后恢复。',
+        next:'接下来 72 小时我不做激进套利，只保证备电和自发自用。'},
+      timeline:[
+        {t:'18:42', who:'管家', what:'检测到电网失压，47 毫秒内切到离网，家里没有断电'},
+        {t:'18:43', who:'管家', what:'进入安全模式，停止一切套利安排'},
+        {t:'18:44', who:'管家', what:'App 推送 + 短信 + 电话三通道通知你'},
+        {t:'18:51', who:'业主', what:'确认收到，回复"家里正常"'},
+        {t:'19:05', who:'安装商', what:'远程确认电池温度与放电功率正常'},
+        {t:'19:29', who:'管家', what:'电网恢复，切换回并网，开始给电池补电'},
+        {t:'19:31', who:'管家', what:'发出恢复汇报，转入保守模式观察 72 小时'}
+      ]},
+    {id:'INC-20260522-001', at:'2026-05-22 14:10', date:'2026-05-22', level:'L2', status:'closed',
+      title:'电池单体温度偏高', owner:'安装商', whoDecides:'installer', recovery:'已处理',
+      briefing:{what:'电池单体温差达到 8.4 摄氏度，超过 8.0 的告警线。',
+        when:'2026-05-22 14:10 – 15:40', who:'Solarwerk Süd GmbH / T. Bauer',
+        impact:'暂停下午放电，当天少赚 €0.12。', decision:'远程暂停放电并安排上门检查。',
+        next:'通风口已清理，之后 30 天温差稳定在 1.2–2.6 摄氏度。'},
+      timeline:[
+        {t:'14:10', who:'管家', what:'检测到单体温差 8.4 摄氏度，主动上报并暂停放电'},
+        {t:'14:12', who:'管家', what:'生成 L2 工单派给安装商，同时通知你'},
+        {t:'14:40', who:'安装商', what:'远程确认，判断为通风口遮挡'},
+        {t:'15:40', who:'安装商', what:'现场清理通风口，复测正常，解除暂停'}
+      ]},
+    {id:'INC-20260616-002', at:'2026-06-16 09:12', date:'2026-06-16', level:'L2', status:'open',
+      title:'光伏预报与实际偏差偏大', owner:'管家', whoDecides:'agent', recovery:'我在观察',
+      briefing:{what:'预报 21.4 度，实际 15.1 度，偏差 29%。', when:'2026-06-16 全天',
+        who:'管家（自主处理）', impact:'当天净收益比预期少 €0.31。',
+        decision:'把次日计划改为更保守的区间，并把光伏置信度从 0.78 下调到 0.72。',
+        next:'连续 5 天偏差小于 12% 后恢复原置信度。'},
+      timeline:[
+        {t:'09:12', who:'管家', what:'发现上午发电低于预报 31%'},
+        {t:'09:15', who:'管家', what:'自动把当天后续计划改为保守模式，取消一次午间放电'},
+        {t:'21:30', who:'管家', what:'日终结算，记录偏差并下调预报置信度'}
+      ]},
+    {id:'INC-20260615-001', at:'2026-06-15 18:10', date:'2026-06-15', level:'L2', status:'open',
+      title:'电价数据源中断 38 分钟', owner:'等待你确认', whoDecides:'user', recovery:'等你选择口径',
+      briefing:{what:'零售电价接口 18:10–18:48 没有返回新数据。', when:'2026-06-15 18:10 – 18:48',
+        who:'业主（需要你选一个口径）', impact:'这段时间我切到保守，少赚约 €0.22。',
+        decision:'切保守模式，只保证自发自用与备电。',
+        next:'你可以在今日页点"手动填写电价"，或直接忽略——数据已恢复。'},
+      timeline:[
+        {t:'18:10', who:'管家', what:'电价源超过 30 分钟未更新，标记为陈旧'},
+        {t:'18:11', who:'管家', what:'切到保守模式，暂停所有套利'},
+        {t:'18:48', who:'管家', what:'数据恢复，恢复自动模式并通知你'}
+      ]},
+    {id:'INC-20260614-001', at:'2026-06-14 22:05', date:'2026-06-14', level:'L1', status:'closed',
+      title:'电池单体温差 3.2 摄氏度', owner:'管家', whoDecides:'agent', recovery:'已恢复',
+      briefing:{what:'晚间高负荷后温差升到 3.2 摄氏度。', when:'2026-06-14 22:05',
+        who:'管家', impact:'无收益影响。', decision:'降低 10 分钟放电功率，温差回落到 1.8。',
+        next:'继续按天记录，超过 8.0 才升级为 L2。'},
+      timeline:[{t:'22:05',who:'管家',what:'检测到温差 3.2，自动降功率 10 分钟'},
+        {t:'22:20',who:'管家',what:'温差回落至 1.8，恢复正常功率'}]},
+    {id:'INC-20260611-001', at:'2026-06-11 12:40', date:'2026-06-11', level:'L1', status:'closed',
+      title:'上网功率被电网限制', owner:'管家', whoDecides:'agent', recovery:'已恢复',
+      briefing:{what:'12:40 起上网功率被限制在 3.6 度/小时以下，持续 22 分钟。',
+        when:'2026-06-11 12:40 – 13:02', who:'管家', impact:'少上网 0.4 度，约 €0.03。',
+        decision:'把多余的发电转给热水器，减少浪费。', next:'已在电网侧恢复，无需处理。'},
+      timeline:[{t:'12:40',who:'管家',what:'检测到上网受限，自动把余电转给热水器'},
+        {t:'13:02',who:'管家',what:'限制解除，恢复上网'}]},
+    {id:'INC-20260607-001', at:'2026-06-07 03:20', date:'2026-06-07', level:'L1', status:'closed',
+      title:'逆变器固件升级后重启', owner:'安装商', whoDecides:'installer', recovery:'已恢复',
+      briefing:{what:'固件 V1.42.7 升级后设备重启一次，中断 6 分钟。', when:'2026-06-07 03:20',
+        who:'Solarwerk Süd GmbH', impact:'无收益影响，发生在夜间。', decision:'按计划升级，选择在无动作时段。',
+        next:'下次升级前我会提前 48 小时告诉你。'},
+      timeline:[{t:'03:20',who:'安装商',what:'远程推送固件并重启设备'},
+        {t:'03:26',who:'管家',what:'设备恢复，校验参数与红线全部一致'}]},
+    {id:'INC-20260603-001', at:'2026-06-03 13:00', date:'2026-06-03', level:'L1', status:'closed',
+      title:'负电价时段未执行动作', owner:'管家', whoDecides:'agent', recovery:'已恢复',
+      briefing:{what:'12:00–13:00 零售电价跌到 −€0.04，我原本应存电，但当时电池已接近满格。',
+        when:'2026-06-03 12:00 – 13:00', who:'管家', impact:'错过了约 €0.08 的收益。',
+        decision:'如实记录为未执行，不做凑数动作。', next:'把这种情况标注为"容量不足"，不计入系统故障。'},
+      timeline:[{t:'13:00',who:'管家',what:'记录未执行原因：容量不足'}]},
+    {id:'INC-20260612-001', at:'2026-06-12 17:34', date:'2026-06-12', level:'L0', status:'closed',
+      title:'计划偏差 12 分钟', owner:'管家', whoDecides:'agent', recovery:'已自愈',
+      briefing:{what:'放电起始时间比计划晚 12 分钟。', when:'2026-06-12 17:34', who:'管家',
+        impact:'无收益影响。', decision:'按实际执行，记录偏差。', next:'无需处理。'},
+      timeline:[{t:'17:34',who:'管家',what:'记录偏差 12 分钟，原因：家庭负荷比预计高'}]},
+    {id:'INC-20260605-001', at:'2026-06-05 06:00', date:'2026-06-05', level:'L0', status:'closed',
+      title:'天气预报源更新', owner:'系统', whoDecides:'agent', recovery:'已自愈',
+      briefing:{what:'主天气源更新了下午的云量预报。', when:'2026-06-05 06:00', who:'系统',
+        impact:'无。', decision:'按新预报重算当天计划。', next:'无需处理。'},
+      timeline:[{t:'06:00',who:'系统',what:'接收新预报并重算计划'}]},
+    {id:'INC-20260528-001', at:'2026-05-28 18:00', date:'2026-05-28', level:'L0', status:'closed',
+      title:'电价曲线例行微调', owner:'市场', whoDecides:'agent', recovery:'已自愈',
+      briefing:{what:'德国市场策略包把晚峰起始时间微调 15 分钟。', when:'2026-05-28 18:00',
+        who:'沃太运营', impact:'无。', decision:'自动套用新规则，重算次日计划。', next:'无需处理。'},
+      timeline:[{t:'18:00',who:'运营',what:'发布策略包更新'},{t:'18:01',who:'管家',what:'套用新规则'}]},
+    {id:'INC-20260519-001', at:'2026-05-19 04:00', date:'2026-05-19', level:'L0', status:'closed',
+      title:'例行自检通过', owner:'系统', whoDecides:'agent', recovery:'已自愈',
+      briefing:{what:'电池、逆变器、通信通道例行自检全部通过。', when:'2026-05-19 04:00',
+        who:'系统', impact:'无。', decision:'无需动作。', next:'下次自检 2026-06-19。'},
+      timeline:[{t:'04:00',who:'系统',what:'自检通过，健康度 96.2%'}]}
+  ],
+
+  /* 待确认 / 审批 / 留痕 */
+  pending:[
+    {id:'PA-0007', title:'电价数据暂时取不到', origin:'今日', deadline:'2026-06-17 20:00',
+      level:'L2', ask:'要不要手动填写电价，或者今天就按保守方式走？',
+      detail:'零售电价源从 18:10 起没有更新。我已经切到保守模式，只保证自发自用和停电备用。数据恢复后我会自动回到自动模式并告诉你。',
+      options:['手动填写电价','就按保守走，不用管我']},
+    {id:'PA-0006', title:'把备电底线从 4 小时提高到 5 小时', origin:'电池', deadline:'2026-06-19 23:59',
+      level:'L3', ask:'这会减少每月约 €4 的套利收益，但停电时能多撑一小时。同意吗？',
+      detail:'你 2026-06-20 提交过一次申请，方案是备电从 4 小时提到 5 小时。按近三个月的用法估算，每月套利收益减少约 €4.00。',
+      options:['同意，提到 5 小时','先不改']}
+  ],
+  approvals:[
+    {id:'GR-0006', title:'备电底线 4 小时 → 5 小时', from:'户主', at:'2026-06-16 21:04',
+      status:'pending', impact:'每月约少赚 €4.00，停电多撑 1 小时', need:'业主本人确认'}
+  ],
+  audit:[
+    {at:'2026-06-16 21:04', who:'户主', what:'提交红线变更申请：备电底线 4 小时 → 5 小时', why:'上次停电时觉得心里没底'},
+    {at:'2026-06-13 07:20', who:'户主', what:'推翻决策 D-20260613-003（夜间存电）', why:'半夜充电有声音，影响睡觉'},
+    {at:'2026-06-12 16:20', who:'管家', what:'自动切换运行模式：自动 → 保守', why:'电价数据源中断，非人为'},
+    {at:'2026-06-10 09:00', who:'户主', what:'调整偏好配比：省钱 35→40、护电池 25→20', why:'季度复核对话结果'},
+    {at:'2026-06-01 10:12', who:'安装商', what:'远程读取近 30 天决策日志', why:'客户来电排查，已授权'},
+    {at:'2026-05-22 14:10', who:'安装商', what:'暂停一次放电并派工单', why:'电池单体温度偏高'},
+    {at:'2026-04-02 20:30', who:'户主', what:'确认套利价差门槛为 €0.15/度', why:'季度复核第 3 问'},
+    {at:'2026-03-17 07:00', who:'管家', what:'影子期结束，转入建议模式', why:'14 天对照期完成'},
+    {at:'2025-03-04 09:20', who:'户主', what:'完成引导三问，开启影子期', why:'首次开通'}
+  ],
+  review:{ period:'2026 年第 2 季度', status:'due', due:'2026-06-20',
+    previous:{savings:40,backup:40,battery:20}, history:['2026 年第 1 季度（已完成）','2025 年第 4 季度（已完成）'],
+    questions:[
+      {q:'这三个月里，哪一件事让你最不放心？',
+       a:['停电的时候电够不够用','电池会不会提前坏','电费到底省没省','半夜设备会不会有声音']},
+      {q:'如果只能保一个，你更想要哪个？',
+       a:['万一停电，家里多撑几小时','每月多省几块钱','电池多用几年']},
+      {q:'你能接受多大的价格波动风险？',
+       a:['完全不能接受，稳定最重要','能接受小波动，收益优先','无所谓，你看着办']},
+      {q:'哪些时段绝对不要动家里的设备？',
+       a:['23:00–07:00 整夜静默','只想避开 23:00–01:00','没有特别要求']},
+      {q:'接下来三个月，还有什么变化要告诉我？',
+       a:['家里要加一台电动车','要装空调','没什么变化','我要出差，白天家里没人']}
+    ]},
+  cycle:[
+    {period:'2026 年 6 月', used:28.6, budget:50, label:'本月', warn:false},
+    {period:'2026 年第 2 季度', used:96.4, budget:150, label:'本季', warn:false},
+    {period:'2026 年', used:214.8, budget:600, label:'本年', warn:false},
+    {period:'2025 年 12 月', used:31.9, budget:50, label:'去年 12 月', warn:true}
+  ],
+  guardrails:[
+    {id:'G1', name:'停电备用底线', cur:'4 小时', kind:'user', editable:true,
+      help:'低于这个时长我就不再放电了', changedAt:'2026-04-02'},
+    {id:'G2', name:'每月循环预算', cur:'50 次', kind:'user', editable:true,
+      help:'电池每个月最多跑多少个完整循环', changedAt:'2026-03-11'},
+    {id:'G3', name:'套利价差门槛', cur:'€0.15 / 度', kind:'user', editable:true,
+      help:'价差低于这个数我不动手', changedAt:'2026-04-02'},
+    {id:'G4', name:'夜间静默时段', cur:'23:00–07:00', kind:'user', editable:true,
+      help:'这段时间不安排任何充电动作', changedAt:'2026-06-13'},
+    {id:'G5', name:'余电处置偏好', cur:'优先上网', kind:'user', editable:true,
+      help:'多余的电是先存起来还是先卖掉', changedAt:'2025-03-04'},
+    {id:'G6', name:'电池温度上限', cur:'45 摄氏度', kind:'system', editable:false,
+      help:'硬件保护，来自设备说明书', changedAt:null},
+    {id:'G7', name:'最低电量保护', cur:'5%', kind:'system', editable:false,
+      help:'低于这个值电池会受损', changedAt:null},
+    {id:'G8', name:'逆变器功率上限', cur:'5.0 度/小时', kind:'system', editable:false,
+      help:'设备额定的放电与充电上限', changedAt:null}
+  ],
+  guardrailChanges:[
+    {id:'GR-0006', what:'备电底线 4 小时 → 5 小时', at:'2026-06-16', status:'pending', by:'户主'},
+    {id:'GR-0004', what:'新增夜间静默时段 23:00–07:00', at:'2026-06-13', status:'done', by:'户主'},
+    {id:'GR-0003', what:'套利价差门槛 €0.12 → €0.15/度', at:'2026-04-02', status:'done', by:'户主'}
+  ],
+  alerts:[
+    {at:'2026-06-16 22:05', level:'L1', title:'电池单体温差 3.2 摄氏度', state:'已自动恢复'},
+    {at:'2026-06-11 12:40', level:'L1', title:'上网功率被电网限制 22 分钟', state:'已恢复'},
+    {at:'2026-05-22 14:10', level:'L2', title:'电池单体温度偏高 8.4 摄氏度', state:'安装商已处理'}
+  ],
+
+  /* 收益 */
+  reports:{
+    '2026-05':{ label:'2026 年 5 月', net:77.00, vsFactory:13.00, vsNothing:77.00, best:96.00,
+      days:31, until:'2026-05-31',
+      columns:[{k:'什么都不做',v:0},{k:'出厂策略',v:64.00},{k:'管家',v:77.00},{k:'理论最优',v:96.00}],
+      items:[
+        {k:'谷电套利',v:42.10,note:'夜间存电、早晚峰用掉'},
+        {k:'光伏自用',v:38.60,note:'中午的发电直接自己用掉'},
+        {k:'上网收益',v:6.30,note:'余电按 €0.078/度 卖给电网'},
+        {k:'停电兜底避免的损失',v:4.20,note:'按历史停电概率折算'},
+        {k:'电网配合激励',v:1.80,note:'削峰时段的可获得激励'},
+        {k:'来回损耗',v:-9.40,note:'存进去再放出来会损耗约一成'},
+        {k:'电池折旧',v:-6.60,note:'每用一次循环的成本，按 €0.105/度'},
+        {k:'计费更正与退款',v:0.00,note:'本月无'}
+      ]},
+    '2026-04':{ label:'2026 年 4 月', net:62.40, vsFactory:9.80, vsNothing:62.40, best:81.00,
+      days:30, until:'2026-04-30',
+      columns:[{k:'什么都不做',v:0},{k:'出厂策略',v:52.60},{k:'管家',v:62.40},{k:'理论最优',v:81.00}],
+      items:[
+        {k:'谷电套利',v:33.80,note:''},{k:'光伏自用',v:31.20,note:''},{k:'上网收益',v:5.10,note:''},
+        {k:'停电兜底避免的损失',v:3.60,note:''},{k:'电网配合激励',v:1.20,note:''},
+        {k:'来回损耗',v:-7.80,note:''},{k:'电池折旧',v:-4.70,note:''},{k:'计费更正与退款',v:0.00,note:''}
+      ]},
+    '2026-03':{ label:'2026 年 3 月', net:54.10, vsFactory:8.20, vsNothing:54.10, best:70.00,
+      days:31, until:'2026-03-31',
+      columns:[{k:'什么都不做',v:0},{k:'出厂策略',v:45.90},{k:'管家',v:54.10},{k:'理论最优',v:70.00}],
+      items:[
+        {k:'谷电套利',v:29.40,note:''},{k:'光伏自用',v:27.60,note:''},{k:'上网收益',v:4.20,note:''},
+        {k:'停电兜底避免的损失',v:3.10,note:''},{k:'电网配合激励',v:0.90,note:''},
+        {k:'来回损耗',v:-6.90,note:''},{k:'电池折旧',v:-4.20,note:''},{k:'计费更正与退款',v:0.00,note:''}
+      ]},
+    '2026-02':{ label:'2026 年 2 月', net:71.20, vsFactory:11.60, vsNothing:71.20, best:88.00,
+      days:28, until:'2026-02-28',
+      columns:[{k:'什么都不做',v:0},{k:'出厂策略',v:59.60},{k:'管家',v:71.20},{k:'理论最优',v:88.00}],
+      items:[
+        {k:'谷电套利',v:41.90,note:''},{k:'光伏自用',v:19.40,note:''},{k:'上网收益',v:1.60,note:''},
+        {k:'停电兜底避免的损失',v:5.80,note:''},{k:'电网配合激励',v:2.40,note:''},
+        {k:'来回损耗',v:-8.20,note:''},{k:'电池折旧',v:-5.10,note:''},{k:'计费更正与退款',v:13.40,note:'零售商结算更正'}
+      ]},
+    '2026-01':{ label:'2026 年 1 月', net:83.50, vsFactory:14.20, vsNothing:83.50, best:99.00,
+      days:31, until:'2026-01-31',
+      columns:[{k:'什么都不做',v:0},{k:'出厂策略',v:69.30},{k:'管家',v:83.50},{k:'理论最优',v:99.00}],
+      items:[
+        {k:'谷电套利',v:48.60,note:''},{k:'光伏自用',v:14.20,note:''},{k:'上网收益',v:1.10,note:''},
+        {k:'停电兜底避免的损失',v:6.40,note:''},{k:'电网配合激励',v:2.90,note:''},
+        {k:'来回损耗',v:-9.10,note:''},{k:'电池折旧',v:-6.30,note:''},{k:'计费更正与退款',v:25.70,note:'去年 12 月越线补偿'}
+      ]}
+  },
+  reportTrend:[
+    {m:'2026-01',v:83.50},{m:'2026-02',v:71.20},{m:'2026-03',v:54.10},
+    {m:'2026-04',v:62.40},{m:'2026-05',v:77.00}
+  ],
+  contract:{ retailer:'Stadtwerke Muster', until:'2027-03-31', monthsLeft:9,
+    note:'你的合同是动态小时电价，没有月费。按近三个月用法，这个合同比固定电价合同每月多省约 €9。合同到期前 60 天我会提醒你。'},
+
+  /* 市场 */
+  markets:[
+    {id:'DE', name:'德国', code:'DE', health:'健康', version:'v2.3', users:1840,
+      mechanism:'动态小时电价（15 分钟结算）', fee:'分时输配电价', export:'€0.078/度',
+      review:false, fuse:false,
+      ruleChange:{at:'2026-06-10', summary:'输配电费晚峰时段由 17:00–22:00 调整为 16:00–21:00',
+        affected:1284, reviewTriggered:true},
+      defaults:['备电底线 4 小时','套利价差门槛 €0.15/度','夜间静默 23:00–07:00','最低电量保护 5%'],
+      compliance:['德国联邦网络局 §14a 可控负荷条款','上网功率无硬性限制','电池必须有离网切换能力']},
+    {id:'NL', name:'荷兰', code:'NL', health:'健康', version:'v1.9', users:620,
+      mechanism:'日前小时电价', fee:'单一输配电价', export:'€0.092/度', review:false, fuse:false,
+      ruleChange:null,
+      defaults:['备电底线 4 小时','套利价差门槛 €0.12/度','最低电量保护 5%'],
+      compliance:['上网功率不得超过 5.0 度/小时','需申报电池容量']},
+    {id:'BE', name:'比利时', code:'BE', health:'需复核', version:'v1.4', users:310,
+      mechanism:'分时电价（峰 / 谷两档）', fee:'容量费 + 输配电价', export:'€0.061/度',
+      review:true, fuse:false,
+      ruleChange:{at:'2026-05-28', summary:'容量费计算口径从按月最大功率改为按季度均值',
+        affected:310, reviewTriggered:true},
+      defaults:['备电底线 5 小时','套利价差门槛 €0.18/度','最低电量保护 8%'],
+      compliance:['容量费按季度最大功率计费','必须申报离网切换能力']},
+    {id:'AT', name:'奥地利', code:'AT', health:'健康', version:'v1.1', users:145,
+      mechanism:'动态小时电价', fee:'单一输配电价', export:'€0.084/度', review:false, fuse:false,
+      ruleChange:null,
+      defaults:['备电底线 4 小时','套利价差门槛 €0.14/度'],
+      compliance:['上网功率无硬性限制']},
+    {id:'FR', name:'法国', code:'FR', health:'草稿', version:'v0.9', users:88,
+      mechanism:'固定电价 + 高峰日加价', fee:'单一输配电价', export:'€0.070/度',
+      review:false, fuse:false, ruleChange:null,
+      defaults:['备电底线 4 小时','套利价差门槛 €0.20/度'],
+      compliance:['高峰日（每年 22 天）不得放电上网']}
+  ],
+
+  /* 安装商 */
+  installer:{ name:'Solarwerk Süd GmbH', customers:32, needContact:3,
+    tickets:[
+      {id:'TK-2026-0417', from:'客户来电', subject:'A. Keller：想问为什么最近总在晚上充电', status:'处理中',
+        owner:'T. Bauer', opened:'2026-06-11', days:6},
+      {id:'TK-2026-0416', from:'系统告警', subject:'M. Brandt：电池单体温度偏高', status:'处理中',
+        owner:'L. Hoffmann', opened:'2026-06-12', days:5},
+      {id:'TK-2026-0415', from:'客户来电', subject:'张伟：想加装电动车充电桩', status:'待分配',
+        owner:'未分配', opened:'2026-06-14', days:3},
+      {id:'TK-2026-0414', from:'系统告警', subject:'S. Weber：连续 3 天净收益为负', status:'处理中',
+        owner:'T. Bauer', opened:'2026-06-15', days:2}
+    ],
+    customers:[
+      {id:'C-0031', name:'A. Keller', mode:'conservative', modeLabel:'我已暂停套利',
+        incidents7:2, net30:-4.20, note:'电价数据源反复中断，建议检查家庭网关。需要联系。', city:'Bruchsal'},
+      {id:'C-0030', name:'M. Brandt', mode:'auto', modeLabel:'我在按你的规则自动安排',
+        incidents7:1, net30:68.40, note:'电池温度告警已处理。需要联系。', city:'Ettlingen'},
+      {id:'C-0028', name:'张伟', mode:'auto', modeLabel:'我在按你的规则自动安排',
+        incidents7:0, net30:81.20, note:'运行良好，想加装充电桩。需要联系。', city:'Karlsruhe'},
+      {id:'C-0027', name:'S. Weber', mode:'safe', modeLabel:'我已停止优化，设备回到硬件默认',
+        incidents7:3, net30:22.10, note:'逆变器告警，已派单上门。', city:'Rastatt'},
+      {id:'C-0025', name:'L. Fischer', mode:'auto', modeLabel:'我在按你的规则自动安排',
+        incidents7:0, net30:74.60, note:'一切正常。', city:'Baden-Baden'},
+      {id:'C-0024', name:'J. Neumann', mode:'advisory', modeLabel:'我建议，你决定',
+        incidents7:0, net30:41.30, note:'用户选择只看建议，不自动执行。', city:'Pforzheim'},
+      {id:'C-0021', name:'P. Schulz', mode:'auto', modeLabel:'我在按你的规则自动安排',
+        incidents7:1, net30:59.90, note:'一切正常。', city:'Karlsruhe'},
+      {id:'C-0019', name:'R. Vogel', mode:'auto', modeLabel:'我在按你的规则自动安排',
+        incidents7:0, net30:65.10, note:'一切正常。', city:'Bretten'}
+    ],
+    customerDetail:{
+      '张伟':{ strategy:'自动模式 · 省钱 40 / 备电 40 / 护电池 20',
+        guardrails:['备电底线 4 小时','套利价差门槛 €0.15/度','每月循环预算 50 次'],
+        decisions:3, incidents:0, earnings:81.20, profile:'4 人 · Karlsruhe · 8.4 度峰值光伏',
+        tools:['远程查看近 30 天决策','导出一个月的收益明细','申请修改红线（需业主确认）','一键回退出厂策略']},
+      'A. Keller':{ strategy:'保守模式 · 省钱 30 / 备电 55 / 护电池 15',
+        guardrails:['备电底线 6 小时','套利价差门槛 €0.20/度','每月循环预算 35 次'],
+        decisions:6, incidents:2, earnings:-4.20, profile:'2 人 · Bruchsal · 6.2 度峰值光伏',
+        tools:['远程查看近 30 天决策','导出一个月的收益明细','申请修改红线（需业主确认）','一键回退出厂策略']}
+    }
+  },
+
+  /* 设置 */
+  settings:{ prefs:{savings:40, backup:40, battery:20},
+    channels:[{k:'App 推送',on:true},{k:'短信',on:true,note:'仅 L2 以上'},{k:'电话',on:true,note:'仅 L3'},
+      {k:'邮件',on:false}],
+    quiet:'23:00–07:00', dailyMax:3,
+    notifications:[
+      {at:'2026-06-11 23:40', channel:'App 推送', level:'L1',
+        what:'电价曲线例行更新提醒', suppressed:true,
+        reason:'落在你设定的静默时段（23:00–07:00），已改为明早 07:15 在 App 内展示'},
+      {at:'2026-06-15 18:12', channel:'App 推送 + 短信', level:'L2',
+        what:'电价数据源中断，已切保守模式', suppressed:false, reason:''},
+      {at:'2026-06-09 18:44', channel:'App 推送 + 短信 + 电话', level:'L3',
+        what:'片区停电，已切离网供电', suppressed:false, reason:''}
+    ]},
+
+  /* 引导 */
+  onboarding:{ done:true, shadow:{ startedAt:'2025-03-04', endsAt:'2025-03-17', daysTotal:14,
+    daysDone:14, ifFollowed:23.40, delta:11.85,
+    days:[
+      {d:'03-04',advice:'夜间存电 3.0 度',actual:'没执行',followed:false,eur:0},
+      {d:'03-05',advice:'夜间存电 3.4 度',actual:'照做了',followed:true,eur:0.38},
+      {d:'03-06',advice:'晚峰放电',actual:'照做了',followed:true,eur:0.44},
+      {d:'03-07',advice:'夜间存电 2.8 度',actual:'照做了',followed:true,eur:0.31},
+      {d:'03-08',advice:'中午余电上网',actual:'照做了',followed:true,eur:0.22},
+      {d:'03-09',advice:'夜间存电 3.6 度',actual:'没执行',followed:false,eur:0},
+      {d:'03-10',advice:'晚峰放电',actual:'照做了',followed:true,eur:0.51},
+      {d:'03-11',advice:'放弃一次小套利',actual:'照做了',followed:true,eur:0.09},
+      {d:'03-12',advice:'夜间存电 3.2 度',actual:'照做了',followed:true,eur:0.35},
+      {d:'03-13',advice:'中午余电上网',actual:'没执行',followed:false,eur:0},
+      {d:'03-14',advice:'晚峰放电',actual:'照做了',followed:true,eur:0.47},
+      {d:'03-15',advice:'夜间存电 3.0 度',actual:'照做了',followed:true,eur:0.29},
+      {d:'03-16',advice:'中午余电上网',actual:'照做了',followed:true,eur:0.18},
+      {d:'03-17',advice:'晚峰放电',actual:'没执行',followed:false,eur:0}
+    ]},
+    questions:[
+      {q:'家里万一停电，你最担心什么？',
+       opts:['冰箱里的东西坏了','有人在家时需要照明和网络','暖气或热水停了','其实还好，时间都不长'],
+       default:1},
+      {q:'你更在意省钱还是电池用得久？',
+       opts:['省钱优先，能省的都要省','两边都顾，别太激进','电池优先，别为了几毛钱伤它','我没什么偏好，你定'],
+       default:1},
+      {q:'什么时间不要动家里的设备？',
+       opts:['23:00–07:00 整夜','只避开午夜前后','白天家里没人时没问题','没有特别要求'],
+       default:0}
+    ]}
+};
+
+/* ============================================================================
+   2 · 图标（统一 20x20 / 1.5px 线宽 / 无填充；不使用 emoji）
+   ============================================================================ */
+const SV = (p,size)=>'<svg class="ico" viewBox="0 0 20 20" width="'+(size||20)+'" height="'+(size||20)+
+  '" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="butt" aria-hidden="true">'+p+'</svg>';
+const ICONS = {
+  today:      SV('<path d="M2 10h16"/><circle cx="8" cy="10" r="2" fill="currentColor" stroke="none"/>'),
+  plan:       SV('<path d="M3 6h14M3 10h14M3 14h14"/><rect x="6" y="5" width="3" height="2" fill="currentColor" stroke="none"/><rect x="9" y="9" width="3" height="2" fill="currentColor" stroke="none"/><rect x="12" y="13" width="3" height="2" fill="currentColor" stroke="none"/>'),
+  decisions:  SV('<circle cx="6" cy="10" r="2"/><path d="M8 10h9"/><path d="M8 10c3 0 4-4 7-4" stroke-dasharray="3 2"/>'),
+  incidents:  SV('<path d="M10 3l7.5 13h-15z"/><path d="M10 8v4"/>'),
+  household:  SV('<path d="M3 9l7-6 7 6v8H3z"/><path d="M6 14l2.5-3 2.5 2 3-4"/>'),
+  battery:    SV('<rect x="2.5" y="6" width="13" height="8"/><path d="M17.5 9v2"/><rect x="4.5" y="8" width="3" height="4" fill="currentColor" stroke="none"/><rect x="8.5" y="8" width="3" height="4" fill="currentColor" stroke="none"/>'),
+  markets:    SV('<circle cx="10" cy="10" r="7"/><path d="M3 10h14"/><path d="M10 3c3 3.5 3 10.5 0 14M10 3c-3 3.5-3 10.5 0 14"/>'),
+  reports:    SV('<path d="M3 16h14"/><rect x="5" y="10" width="3" height="6"/><rect x="9.5" y="7" width="3" height="9"/><rect x="14" y="4" width="3" height="12"/>'),
+  collaborate:SV('<path d="M6 3v14M14 3v14"/><path d="M8.5 10h3" /><path d="M10 8.5l1.5 1.5-1.5 1.5"/>'),
+  installer:  SV('<path d="M3 17V8l4-3v12"/><path d="M7 17V9l5-3v11"/><path d="M12 17V11l5-3v9"/><rect x="3.6" y="9" width="2.8" height="3"/>'),
+  settings:   SV('<path d="M3 7h14M3 13h14"/><circle cx="8" cy="7" r="1.6" fill="#fff"/><circle cx="12.5" cy="13" r="1.6" fill="#fff"/>'),
+  shadow:     SV('<circle cx="10" cy="10" r="7"/><path d="M10 3a7 7 0 000 14" fill="currentColor" stroke="none"/>'),
+  empty:      SV('<rect x="3" y="4" width="14" height="12"/><path d="M3 12h4l1.5 2h3L13 12h4"/>',32),
+  denied:     SV('<rect x="4" y="9" width="12" height="8"/><path d="M7 9V7a3 3 0 016 0v2"/>',32),
+  degraded:   SV('<path d="M10 3l7.5 13h-15z"/><path d="M10 8v4"/><circle cx="10" cy="14" r=".6" fill="currentColor"/>',32),
+  check:      SV('<path d="M4 10.5l4 4 8-9"/>'),
+  arrow:      SV('<path d="M4 10h11"/><path d="M11 6l4 4-4 4"/>'),
+  up:         SV('<path d="M10 15V6"/><path d="M6 10l4-4 4 4"/>'),
+  down:       SV('<path d="M10 5v9"/><path d="M6 10l4 4 4-4"/>'),
+  info:       SV('<circle cx="10" cy="10" r="7"/><path d="M10 9v5"/><circle cx="10" cy="6.6" r=".7" fill="currentColor"/>')
+};
+
+/* ============================================================================
+   3 · 全局 UI 状态
+   ============================================================================ */
+const DEFAULT_STATE = {
+  route:'today', param:null, anchor:null,
+  role:'owner',                    // owner | installer | ops
+  mode:'auto',
+  pageState:'normal',              // normal | loading | empty | degraded | denied
+  stale:false,                     // 模拟实时数据 > 5 分钟未更新
+  onboarded:true,                  // 引导是否完成（可切换，验证路由守卫）
+  planView:'chart',                // chart | table
+  gridFeeView:false,
+  reportPeriod:'2026-05',
+  trendRange:'month',
+  houseCurve:'workday',            // workday | weekend
+  filters:{decisions:'all', incidents:'all'},
+  reviewStep:0, reviewAnswers:{},
+  onboardStep:0, onboardAnswers:{},
+  planActions:[],                  // 已接受/锁单等
+  resolved:{},                     // 已处理的待确认项 / 已批准的申请
+  toast:null
+};
+let S;
+try{ S = JSON.parse(JSON.stringify(DEFAULT_STATE)); }catch(e){ S = DEFAULT_STATE; }
+
+const MODES = {
+  'shadow':       {name:'我在学习，只看不做',            tone:'',        reason:null, resume:null},
+  'advisory':     {name:'我建议，你决定',                tone:'',        reason:null, resume:null},
+  'auto':         {name:'我在按你的规则自动安排',        tone:'acc',     reason:null, resume:null},
+  'conservative': {name:'我已暂停套利',                  tone:'warn',    reason:'有一个动作会用到你停电时留的电，我先停了',
+                   resume:'电价数据恢复或你放行后，我会自动回到自动模式，并告诉你'},
+  'safe':         {name:'我已停止优化，设备回到硬件默认', tone:'danger',  reason:'出了安全相关的问题，需要沃太售后跟进',
+                   resume:'由安装商或沃太售后确认设备正常后解除'},
+  'manual-hold':  {name:'人工接管中',                    tone:'danger',  reason:'有人正在处理你的事',
+                   resume:'接管人处理完毕后解除；期间我不执行任何动作'}
+};
+const MODE_ORDER = ['shadow','advisory','auto','conservative','safe','manual-hold'];
+
+const ROLES = [
+  {id:'owner', label:'业主（户主）'},
+  {id:'installer', label:'安装商'},
+  {id:'ops', label:'沃太运营'}
+];
+const ROLE_HINT = {
+  'markets':      {owner:'这是给安装商和沃太运营看的页面'},
+  'installer':    {owner:'这是安装商的工作台'}
+};
+
+const NAV_GROUPS = [
+  {group:'今日', items:[{id:'today',label:'今日',icon:'today'}]},
+  {group:'计划', items:[
+    {id:'plan',label:'计划',icon:'plan'},
+    {id:'decisions',label:'决策',icon:'decisions'},
+    {id:'incidents',label:'异常',icon:'incidents',badge:()=>openIncidents().length}]},
+  {group:'设备', items:[
+    {id:'household',label:'家庭',icon:'household'},
+    {id:'battery',label:'电池',icon:'battery',attn:()=>SIM.cycle[0].used/SIM.cycle[0].budget>0.5},
+    {id:'markets',label:'市场',icon:'markets',roles:['installer','ops']}]},
+  {group:'账户', items:[
+    {id:'reports',label:'收益',icon:'reports'},
+    {id:'collaborate',label:'协作',icon:'collaborate',badge:()=>SIM.pending.length},
+    {id:'installer',label:'安装商视图',icon:'installer',roles:['installer','ops']},
+    {id:'settings',label:'设置',icon:'settings'}]}
+];
+
+const FRESH = {
+  today:      {at:'18:24', source:'电池自身'},
+  plan:       {at:'18:02', source:'零售商电价'},
+  decisions:  {at:'18:24', source:'决策日志'},
+  incidents:  {at:'18:24', source:'事件中心'},
+  household:  {at:'17:00', source:'家庭画像'},
+  battery:    {at:'18:24', source:'电池自身'},
+  markets:    {at:'06:00', source:'沃太策略包'},
+  reports:    {at:'06:00', source:'电费结算'},
+  collaborate:{at:'18:24', source:'留痕中心'},
+  installer:  {at:'18:24', source:'客户账户'},
+  settings:   {at:'18:24', source:'本地设置'},
+  onboarding: {at:'18:24', source:'本地'}
+};
+
+/* ---------- 小工具 ---------- */
+function openIncidents(){ return SIM.incidents.filter(i=>i.status==='open'); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function join(a,sep){ return a.filter(Boolean).join(sep===undefined?' · ':sep); }
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function sum(a){ return a.reduce((x,y)=>x+y,0); }
+function modeObj(){ return MODES[S.mode]; }
+function roleLabel(){ return (ROLES.find(r=>r.id===S.role)||ROLES[0]).label; }
+function isOwner(){ return S.role==='owner'; }
+
+/* ---------- 通用片段 ---------- */
+function badge(text,tone,dot){
+  return '<span class="badge '+(tone||'')+'">'+(dot?'<i class="dotm"></i>':'')+esc(text)+'</span>';
+}
+function modeBadge(m){ const x=MODES[m]||MODES.auto; return badge(x.name, x.tone==='danger'?'danger':x.tone==='warn'?'warn':x.tone==='acc'?'acc':'ghost'); }
+function levelBadge(lv){
+  const tone = lv==='L3'?'danger':lv==='L2'?'warn':lv==='L1'?'ghost':'ghost';
+  return badge(lv==='L0'?'L0 记录':lv==='L1'?'L1 提示':lv==='L2'?'L2 需要确认':'L3 紧急',tone);
+}
+function resultBadge(d){
+  const m={executed:['已执行','ok'],overridden:['被你推翻','warn'],takenover:['人工接管','danger'],
+    forgone:['主动放弃','ghost'],running:['执行中','acc'],degraded:['已降级','warn']};
+  const x=m[d.result]||[d.resultLabel,'ghost'];
+  return badge(d.resultLabel||x[0],x[1],d.result==='running');
+}
+function card(inner,cls){ return '<section class="card '+(cls||'')+'">'+inner+'</section>'; }
+function cardHead(title,meta){
+  return '<div class="card-head"><h2>'+esc(title)+'</h2>'+(meta?'<div class="meta">'+meta+'</div>':'')+'</div>';
+}
+function stampFor(key){
+  const f=FRESH[key]||{at:'18:24',source:'本地'};
+  if(S.stale){
+    return '<button class="freshness stale" data-act="stamp">· 已 42 分钟未更新</button> '+
+      '<span class="tiny dim">更新于 '+f.at+' · '+esc(f.source)+'</span>';
+  }
+  return '<button class="freshness" data-act="stamp">更新于 '+f.at+' · '+esc(f.source)+'</button>';
+}
+function stateBlock(kind,title,desc,action){
+  const ic = kind==='denied'?ICONS.denied:kind==='degraded'?ICONS.degraded:ICONS.empty;
+  return '<div class="stateblock">'+ic+'<h3>'+esc(title)+'</h3><p>'+desc+'</p>'+
+    (action||'')+'</div>';
+}
+function skeleton(page){
+  const map={
+    today:['l1','l1','l1','box120','box240','rowline','rowline','rowline'],
+    plan:['box64','box240','rowline','rowline','rowline','rowline'],
+    decisions:['box64','row48','row48','row48','row48','row48','row48'],
+    incidents:['box64','row48','row48','row48','row48','row48','row48'],
+    household:['box120','box200','rowline','rowline','rowline','rowline'],
+    battery:['box120','box200','rowline','rowline','rowline','rowline'],
+    reports:['l1','rowline','rowline','rowline','rowline','l1','rowline','rowline'],
+    collaborate:['l1','rowline','rowline','rowline','rowline','l1','rowline','rowline'],
+    settings:['l1','rowline','rowline','rowline','rowline','l1','rowline','rowline'],
+    markets:['row48','row48','row48','row48','row48','row48','row48','row48'],
+    installer:['row48','row48','row48','row48','row48','row48','row48','row48']
+  };
+  const rows = map[page]||['l1','row48','row48','row48'];
+  let h='<div class="skel">';
+  rows.forEach((c,i)=>{ const isLast=i===rows.length-1;
+    h+='<i class="'+c+(c==='l2'?' w70':'')+'"></i>'; });
+  h+='<div class="hint">正在从你的设备读取数据</div></div>';
+  return h;
+}
+function kv(k,v,cls){ return '<div class="kv"><span class="k">'+esc(k)+'</span><span class="v '+(cls||'')+'">'+v+'</span></div>'; }
+function table(head,rows,opts){
+  opts=opts||{};
+  return '<div class="tbl-wrap"><table class="tbl">'+(opts.caption?'<caption>'+esc(opts.caption)+'</caption>':'')+
+    '<thead><tr>'+head.map(h=>'<th'+(h.r?' class="r"':'')+'>'+esc(h.t||h)+'</th>').join('')+'</tr></thead><tbody>'+
+    rows.map(r=>(function(){ const act=r.__click||opts.rowAct; const idA=(r.__id!==undefined&&r.__id!==null)?' data-id="'+esc(r.__id)+'"':'';
+      return '<tr'+(act?' class="clickable" data-act="'+act+'"'+idA:'')+'>';})()+
+      r.cells.map((c,i)=>'<td'+(head[i]&&head[i].r?' class="r"':'')+' data-k="'+esc(head[i]&&head[i].t||head[i]||'')+'">'+c+'</td>').join('')+'</tr>').join('')+
+    '</tbody></table></div>';
+}
+
+/* ---------- 图表（单色阶 + 一个强调色；带坐标轴与单位） ---------- */
+function chartPrice(prices,fee,opt){
+  opt=opt||{};
+  const W=720,H=opt.h||180,PADL=34,PADR=8,PADT=12,PADB=24;
+  const totals=prices.map((p,i)=>p+fee[i]);
+  const max=Math.max.apply(null,totals), min=Math.min(0,Math.min.apply(null,totals));
+  const span=(max-min)||1, y0=H-PADB, yTop=PADT;
+  const bw=(W-PADL-PADR)/24;
+  const yOf=v=> y0-(v-min)/span*(y0-yTop);
+  const zeroY=yOf(0);
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="明日 24 小时合计电价柱状图，单位欧元每度，最低出现在 12 点，最高出现在 18 点">';
+  for(let i=0;i<=4;i++){ const v=min+span*i/4, y=yOf(v);
+    s+='<line class="gridline" x1="'+PADL+'" y1="'+y.toFixed(1)+'" x2="'+(W-PADR)+'" y2="'+y.toFixed(1)+'" opacity=".7"/>'+
+       '<text class="lbl" x="'+(PADL-6)+'" y="'+(y+3).toFixed(1)+'" text-anchor="end">'+v.toFixed(2)+'</text>'; }
+  if(min<0) s+='<line class="axis" x1="'+PADL+'" y1="'+zeroY.toFixed(1)+'" x2="'+(W-PADR)+'" y2="'+zeroY.toFixed(1)+'"/>';
+  prices.forEach((p,i)=>{
+    const y=yOf(totals[i]), hgt=Math.max(1,Math.abs(y-zeroY));
+    const top = totals[i]>=0? y : zeroY;
+    const inWindow = opt.window && i>=opt.window[0] && i<opt.window[1];
+    const cls = inWindow?'bar hot':(totals[i]<0.1?'bar warn':'bar');
+    s+='<rect class="'+cls+'" x="'+(PADL+bw*i+1).toFixed(1)+'" y="'+top.toFixed(1)+'" width="'+(bw-2).toFixed(1)+'" height="'+hgt.toFixed(1)+'"/>';
+  });
+  s+='<line class="axis" x1="'+PADL+'" y1="'+y0+'" x2="'+(W-PADR)+'" y2="'+y0+'"/>';
+  [0,6,12,18,23].forEach(i=>{ s+='<text class="lbl" x="'+(PADL+bw*i+bw/2).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+String(i).padStart(2,'0')+':00</text>'; });
+  s+='<text class="lbl" x="'+PADL+'" y="'+(PADT-2)+'" text-anchor="start">欧元 / 度（零售电价 + 输配电费）</text>';
+  s+='</svg>';
+  return s;
+}
+function chartPvLoad(pv,load,opt){
+  opt=opt||{};
+  const W=720,H=opt.h||180,PADL=34,PADR=8,PADT=12,PADB=24;
+  const max=Math.max(Math.max.apply(null,pv),Math.max.apply(null,load),1);
+  const x=i=>PADL+(W-PADL-PADR)*i/23, y=v=>H-PADB-(H-PADB-PADT)*v/max;
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="明日光伏发电与家庭负荷对比折线图，单位度每小时">';
+  for(let i=0;i<=3;i++){ const v=max*i/3, yy=y(v);
+    s+='<line class="gridline" x1="'+PADL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-PADR)+'" y2="'+yy.toFixed(1)+'"/>'+
+       '<text class="lbl" x="'+(PADL-6)+'" y="'+(yy+3).toFixed(1)+'" text-anchor="end">'+v.toFixed(1)+'</text>'; }
+  s+='<path class="area" d="M'+x(0)+','+y(0)+' '+'L'+pv.map((v,i)=>x(i)+','+y(v)).join(' L')+' L'+x(23)+','+y(0)+' Z"/>';
+  s+='<path class="line accent" d="M'+pv.map((v,i)=>x(i)+','+y(v)).join(' L')+'"/>';
+  s+='<path class="line dashed" d="M'+load.map((v,i)=>x(i)+','+y(v)).join(' L')+'"/>';
+  s+='<line class="axis" x1="'+PADL+'" y1="'+(H-PADB)+'" x2="'+(W-PADR)+'" y2="'+(H-PADB)+'"/>';
+  [0,6,12,18,23].forEach(i=>{ s+='<text class="lbl" x="'+x(i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+String(i).padStart(2,'0')+':00</text>'; });
+  s+='<text class="lbl" x="'+PADL+'" y="'+(PADT-2)+'">度 / 小时</text>';
+  s+='</svg>';
+  return s;
+}
+function chartLine(series,opt){
+  opt=opt||{};
+  const W=720,H=opt.h||170,PADL=34,PADR=8,PADT=12,PADB=24;
+  const vals=series.map(p=>p.v);
+  const max=opt.max!==undefined?opt.max:Math.max.apply(null,vals);
+  const min=opt.min!==undefined?opt.min:Math.min.apply(null,vals);
+  const span=(max-min)||1;
+  const n=series.length;
+  const x=i=>PADL+(W-PADL-PADR)*(n===1?0:i/(n-1)), y=v=>H-PADB-(H-PADB-PADT)*(v-min)/span;
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(opt.aria||'折线图')+'">';
+  for(let i=0;i<=3;i++){ const v=min+span*i/3, yy=y(v);
+    s+='<line class="gridline" x1="'+PADL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-PADR)+'" y2="'+yy.toFixed(1)+'"/>'+
+       '<text class="lbl" x="'+(PADL-6)+'" y="'+(yy+3).toFixed(1)+'" text-anchor="end">'+(opt.fmt?opt.fmt(v):v.toFixed(0))+'</text>'; }
+  if(opt.band) s+='<rect class="band'+(opt.bandTone==='warn'?' warn':'')+'" x="'+x(opt.band[0]).toFixed(1)+'" y="'+PADT+'" width="'+(x(opt.band[1])-x(opt.band[0])).toFixed(1)+'" height="'+(H-PADB-PADT)+'"/>';
+  s+='<path class="line accent" d="M'+series.map((p,i)=>x(i).toFixed(1)+','+y(p.v).toFixed(1)).join(' L')+'"/>';
+  if(opt.marks) opt.marks.forEach(m=>{ s+='<circle class="mk accent" cx="'+x(m.i).toFixed(1)+'" cy="'+y(series[m.i].v).toFixed(1)+'" r="3.5"/>'; });
+  s+='<line class="axis" x1="'+PADL+'" y1="'+(H-PADB)+'" x2="'+(W-PADR)+'" y2="'+(H-PADB)+'"/>';
+  if(opt.ticks) opt.ticks.forEach(t=>{ s+='<text class="lbl" x="'+x(t.i).toFixed(1)+'" y="'+(H-8)+'" text-anchor="middle">'+esc(t.t)+'</text>'; });
+  if(opt.unit) s+='<text class="lbl" x="'+PADL+'" y="'+(PADT-2)+'">'+esc(opt.unit)+'</text>';
+  s+='</svg>';
+  return s;
+}
+function chartBars(items,opt){
+  opt=opt||{};
+  const W=720,H=opt.h||180,PADL=40,PADR=8,PADT=12,PADB=28;
+  const max=Math.max.apply(null,items.map(i=>i.v))||1;
+  const bw=(W-PADL-PADR)/items.length;
+  const y0=H-PADB;
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+(opt.aria||'柱状图')+'">';
+  for(let i=0;i<=3;i++){ const v=max*i/3, yy=y0-(y0-PADT)*i/3;
+    s+='<line class="gridline" x1="'+PADL+'" y1="'+yy.toFixed(1)+'" x2="'+(W-PADR)+'" y2="'+yy.toFixed(1)+'"/>'+
+       '<text class="lbl" x="'+(PADL-6)+'" y="'+(yy+3).toFixed(1)+'" text-anchor="end">€'+v.toFixed(0)+'</text>'; }
+  items.forEach((it,i)=>{ const hgt=(y0-PADT)*it.v/max;
+    s+='<rect class="bar'+(it.hot?' hot':'')+'" x="'+(PADL+bw*i+bw*0.22).toFixed(1)+'" y="'+(y0-hgt).toFixed(1)+
+      '" width="'+(bw*0.56).toFixed(1)+'" height="'+hgt.toFixed(1)+'"/>'+
+      '<text class="lbl" x="'+(PADL+bw*i+bw/2).toFixed(1)+'" y="'+(y0-hgt-4).toFixed(1)+'" text-anchor="middle">€'+it.v.toFixed(0)+'</text>'+
+      '<text class="lbl" x="'+(PADL+bw*i+bw/2).toFixed(1)+'" y="'+(H-9)+'" text-anchor="middle">'+esc(it.k)+'</text>'; });
+  s+='<line class="axis" x1="'+PADL+'" y1="'+y0+'" x2="'+(W-PADR)+'" y2="'+y0+'"/>';
+  s+='</svg>';
+  return s;
+}
+function socSeries(){
+  const seg=[[0,38.0],[130,36.5],[280,78.0],[540,74.0],[700,71.0],[750,76.0],[960,88.0],[1020,92.0],
+             [1104,62.4],[1140,60.0],[1260,52.0],[1425,48.0]];
+  const out=[];
+  for(let i=0;i<96;i++){
+    const m=i*15;
+    let a=seg[0],b=seg[1];
+    for(let j=0;j<seg.length-1;j++){ if(m>=seg[j][0]&&m<=seg[j+1][0]){a=seg[j];b=seg[j+1];break;} a=seg[seg.length-2];b=seg[seg.length-1]; }
+    const t=(b[0]===a[0])?0:(m-a[0])/(b[0]-a[0]);
+    out.push({i:i,v:+(a[1]+(b[1]-a[1])*clamp(t,0,1)).toFixed(1)});
+  }
+  return out;
+}
+
+/* ============================================================================
+   4 · 外壳渲染（侧边栏 / 顶栏 / 面包屑 / 模式条 / 移动端）
+   ============================================================================ */
+function visibleItem(it){ return !it.roles || it.roles.indexOf(S.role)>=0; }
+function navAllowed(id){
+  if(id==='markets' && S.role==='owner') return true;   // 可见性交给权限不足模板
+  return true;
+}
+function renderNav(){
+  let h='';
+  NAV_GROUPS.forEach(g=>{
+    const items=g.items.filter(visibleItem);
+    if(!items.length) return;
+    h+='<div class="nav-group"><div class="nav-title">'+esc(g.group)+'</div>';
+    items.forEach(it=>{
+      const on = S.route===it.id || (it.id==='decisions'&&S.route==='decisions') ||
+                 (it.id==='incidents'&&S.route==='incidents') ||
+                 (it.id==='collaborate'&&S.route==='collaborate') ||
+                 (it.id==='markets'&&S.route==='markets') ||
+                 (it.id==='installer'&&S.route==='installer');
+      const n = it.badge?it.badge():0;
+      h+='<button class="nav-item'+(on?' on':'')+(it.attn&&it.attn()&&!on?' attn':'')+'" data-goto="'+it.id+'"'+
+         (on?' aria-current="page"':'')+'>'+ICONS[it.icon]+'<span class="lbl">'+esc(it.label)+'</span>'+
+         (n>0?'<span class="badge">'+n+'</span>':'')+'</button>';
+    });
+    h+='</div>';
+  });
+  document.getElementById('nav').innerHTML=h;
+
+  document.getElementById('roleSwitch').innerHTML = ROLES.map(r=>
+    '<button class="role-btn'+(S.role===r.id?' on':'')+'" data-role="'+r.id+'" aria-pressed="'+(S.role===r.id)+'">'+
+    '<i class="dot"></i><span class="lbl">'+esc(r.label)+'</span></button>').join('');
+
+  document.getElementById('mobileBar').innerHTML = NAV_GROUPS.map(g=>{
+    const it=g.items[0];
+    const on = S.route===it.id;
+    return '<button data-goto="'+it.id+'"'+(on?' class="on" aria-current="page"':'')+'>'+ICONS[it.icon]+'<span>'+esc(g.group)+'</span></button>';
+  }).join('');
+}
+function renderTopbar(){
+  const el=document.getElementById('crumbs');
+  const P=window.PAGES[S.route];
+  const title = P?P.title:'页面';
+  if(S.route==='today') el.innerHTML='<span class="app-name">沃太家庭能源管家</span>';
+  else{
+    const group = groupOf(S.route);
+    const segs=[];
+    if(group && group!==title) segs.push('<span class="prev" data-goto="'+S.route+'">'+esc(group)+'</span>');
+    if(S.param) segs.push('<span class="prev" data-goto="'+S.route+'">'+esc(title)+'</span>');
+    segs.push('<span class="cur">'+esc(S.param?paramName():title)+'</span>');
+    el.innerHTML = segs.join('<span class="sep">›</span>');
+  }
+  const m=modeObj();
+  const mb=document.getElementById('modebar');
+  mb.className='modebar s-'+S.mode;
+  mb.setAttribute('data-goto','collaborate');
+  mb.innerHTML='<i class="chip"></i><span class="name">'+esc(m.name)+'</span>'+
+    (m.reason?'<span class="why">'+esc(m.reason)+'</span>':'')+
+    (S.mode==='manual-hold'?'<span class="why">接管人：T. Bauer · 2026-05-22 14:10 起</span>':'');
+  const f=FRESH[S.route]||FRESH.today;
+  const fe=document.getElementById('freshness');
+  if(S.stale){ fe.className='freshness stale'; fe.textContent='· 已 42 分钟未更新'; }
+  else{ fe.className='freshness'; fe.textContent='更新于 '+f.at+' · '+f.source; }
+  document.getElementById('protoToday').textContent=T.today+' '+weekday(T.today);
+}
+function groupOf(route){
+  const map={today:'今日',plan:'计划',decisions:'计划',incidents:'计划',household:'设备',battery:'设备',
+    markets:'设备',reports:'账户',collaborate:'账户',installer:'账户',settings:'账户',onboarding:'引导'};
+  return map[route];
+}
+function paramName(){
+  if(S.route==='decisions'){ const d=SIM.decisions.find(x=>x.id===S.param); return d?(d.at+' '+d.actionLabel):'决策详情'; }
+  if(S.route==='incidents'){ const i=SIM.incidents.find(x=>x.id===S.param); return i?i.title:'事故简报'; }
+  if(S.route==='markets'){ const m=SIM.markets.find(x=>x.id===S.param); return m?m.name:'策略包详情'; }
+  if(S.route==='installer'){ return S.param?S.param:'客户详情'; }
+  return S.param||'';
+}
+function degBanner(){
+  const m=modeObj();
+  if(S.mode==='auto'||S.mode==='shadow'||S.mode==='advisory') return '';
+  const rows={
+    'conservative':{t:'有一个动作会用到你停电时留的电，我先停了',d:'你不用做任何事，想让我做就点右边。',b:'查看这次机会',
+      cond:'恢复条件：电价数据恢复或你放行后，我会自动回到自动模式'},
+    'safe':{t:'出了安全相关的问题，我已经停止一切优化，设备回到硬件默认行为',d:'需要沃太售后跟进，我已经把材料准备好。',b:'查看事故简报',
+      cond:'恢复条件：由安装商或沃太售后确认设备正常后解除',tone:'safe'},
+    'manual-hold':{t:'有人正在处理你的事，我在他处理完之前不会执行任何动作',d:'接管人：Solarwerk Süd GmbH / T. Bauer，2026-05-22 14:10 起。',b:'查看处置进度',
+      cond:'恢复条件：接管人处理完毕后解除',tone:'manual'}
+  };
+  const r=rows[S.mode]||rows['conservative'];
+  return '<div class="banner '+(r.tone||'')+'" role="status"><span>'+ICONS.info+'</span><div><div class="bt">'+esc(r.t)+'</div>'+
+    '<div class="bd">'+esc(r.d)+'</div></div><div class="ba"><span class="cond">'+esc(r.cond)+'</span>'+
+    '<button class="btn sm" data-act="mode-why">'+esc(r.b)+'</button></div></div>';
+}
+function staleNote(){
+  if(!S.stale) return '';
+  return '<div class="banner safe"><span>'+ICONS.degraded+'</span><div>'+
+    '<div class="bt">该数据暂不可用</div>'+
+    '<div class="bd">我已切到保守策略，优先保证光伏自用与停电备用。这是最近一次有效值，不是当前值。</div>'+
+    '</div><div class="ba"><button class="btn sm" data-act="mode-why">看我怎么做的</button></div></div>';
+}
+function pageHead(h1,sub,actions,extra){
+  return '<div class="page-head"><div class="row"><div><h1 id="page-h1" tabindex="-1">'+esc(h1)+'</h1>'+
+    '<p class="sub">'+sub+'</p></div>'+(actions?'<div class="actions">'+actions+'</div>':'')+'</div>'+
+    (extra?extra:'')+'</div>';
+}
+function protoBar(){
+  const st=[['normal','正常'],['loading','加载中'],['empty','空数据'],['degraded','数据源失效'],['denied','权限不足']];
+  const roles=ROLES;
+  const states=st.map(x=>'<button data-state="'+x[0]+'" class="'+(S.pageState===x[0]?'on':'')+'">'+x[1]+'</button>').join('');
+  const modes=MODE_ORDER.map(m=>'<button data-mode="'+m+'" class="'+(S.mode===m?'on':'')+'">'+MODES[m].name+'</button>').join('');
+  return '<section class="card" id="proto"><div class="card-head"><h2>原型状态切换</h2>'+
+    '<div class="meta">全部为模拟数据，不接入真实电价、天气与设备</div></div>'+
+    '<div class="kv"><span class="k">页面状态</span><span class="v"><span class="seg">'+states+'</span></span></div>'+
+    '<div class="kv"><span class="k">运行模式</span><span class="v"><span class="seg" style="flex-wrap:wrap">'+modes+'</span></span></div>'+
+    '<div class="kv"><span class="k">角色</span><span class="v"><span class="seg">'+
+      roles.map(r=>'<button data-role="'+r.id+'" class="'+(S.role===r.id?'on':'')+'">'+esc(r.label)+'</button>').join('')+'</span></span></div>'+
+    '<div class="kv"><span class="k">数据新鲜度</span><span class="v"><span class="seg">'+
+      '<button data-stale="0" class="'+(!S.stale?'on':'')+'">新鲜</button>'+
+      '<button data-stale="1" class="'+(S.stale?'on':'')+'">超过 5 分钟</button></span></span></div>'+
+    '<div class="kv"><span class="k">引导完成</span><span class="v"><span class="seg">'+
+      '<button data-onb="1" class="'+(S.onboarded?'on':'')+'">已完成</button>'+
+      '<button data-onb="0" class="'+(!S.onboarded?'on':'')+'">未完成（验证路由守卫）</button></span></span></div>'+
+    '<p class="card-note">快捷键：<span class="mono">g</span> 后接 <span class="mono">t p d i h b r c s</span> 跳转；<span class="mono">?</span> 打开快捷键帮助；<span class="mono">Esc</span> 关闭浮层。</p>'+
+    '</section>';
+}
+
+/* ============================================================================
+   5 · 路由
+   ============================================================================ */
+function parseHash(){
+  const raw=location.hash.replace(/^#\/?/,'');
+  const parts=raw.split('#');
+  const seg=parts[0].split('/').filter(Boolean);
+  return {route:seg[0]||'today', param:seg[1]?decodeURIComponent(seg[1]):null, anchor:parts[1]||null};
+}
+function go(route,param,anchor){
+  let h='#/'+route+(param?'/'+encodeURIComponent(param):'');
+  if(anchor) h+='#'+anchor;
+  if(location.hash===h) render(); else location.hash=h;
+}
+function render(){
+  let p=parseHash();
+  S.route=p.route; S.param=p.param; S.anchor=p.anchor;
+
+  /* 引导守卫 */
+  if(!S.onboarded && S.route!=='onboarding' && S.route!=='settings'){
+    S.pendingRoute = S.route;
+    S.route='onboarding'; S.param=null;
+  }
+  if(S.route==='onboarding') S.param=null;
+
+  const DETAIL={decisions:'_decisionDetail',incidents:'_incidentsDetail'};
+  const P=(S.param&&DETAIL[S.route]&&window.PAGES[DETAIL[S.route]])||window.PAGES[S.route];
+  if(!P){ S.route='_404'; }
+
+  renderNav(); renderTopbar();
+
+  const main=document.getElementById('main');
+  let body='';
+
+  if(S.route==='_404'){
+    body=stateBlock('denied','这个地址不存在','可能是链接过期了。你可以从下面的入口回到常用页面。',
+      '<button class="btn" data-goto="today">回到今日</button>');
+  }else if(S.pageState==='loading'){
+    body=skeleton(S.route);
+  }else if(S.pageState==='denied' || (ROLE_HINT[S.route] && S.role==='owner' && (S.route==='markets'||S.route==='installer'))){
+    const d=P.denied||{title:'这件事只有业主本人能改',desc:'涉及停电备用和电池寿命，安装商不能代改。你可以发起一个申请，让业主一键确认。',action:'发起变更申请'};
+    body=stateBlock('denied',d.title,d.desc,'<button class="btn" data-act="ask-owner">'+esc(d.action||'发起变更申请')+'</button>');
+  }else if(S.pageState==='empty'){
+    const e=P.empty||{title:'现在没有内容',desc:'换个时间再来看看。'};
+    body=stateBlock('empty',e.title,e.desc,e.action?'<button class="btn" data-goto="'+e.action+'">'+esc(e.actionLabel||'去看看')+'</button>':'');
+  }else{
+    body=P.render();
+    if(S.pageState==='degraded'){ body=staleNote()+degBanner()+body; }
+    else body=degBanner()+body;
+  }
+  if(S.route!=='onboarding' && S.route!=='_404') body+=protoBar();
+  main.innerHTML=body;
+
+  const h1=document.getElementById('page-h1');
+  if(h1 && document.activeElement!==document.getElementById('nav')) { try{h1.focus({preventScroll:true});}catch(e){} }
+  if(S.anchor){ const a=document.getElementById(S.anchor); if(a) a.scrollIntoView({block:'start'}); }
+  else window.scrollTo(0,0);
+  document.getElementById('overflowMenu').classList.remove('open');
+}
+
+/* ============================================================================
+   6 · 循环与流程片段
+   ============================================================================ */
+function cycleCard(c){
+  const p=(c.used/c.budget*100);
+  const tone = p>=60?'warn':p>=50?'acc':'';
+  return '<div style="padding:10px 0;border-bottom:1px solid var(--line)">'+
+    '<div style="display:flex;justify-content:space-between;font-size:13px"><span>'+esc(c.period)+'</span>'+
+    '<span class="num">'+c.used.toFixed(1)+' / '+c.budget.toFixed(0)+' 次 <span class="dim tiny">'+pct(p)+'</span></span></div>'+
+    '<div class="bar lg" style="margin-top:8px"><i class="'+tone+'" style="width:'+pct(Math.min(p,100),0)+'"></i></div>'+
+    (c.warn?'<div class="tiny" style="color:var(--warn);margin-top:6px">超过提醒线 60%，我下个月会自动收紧</div>':'')+'</div>';
+}
+function guardrailRows(list){
+  return list.map(g=>'<tr>'+
+    '<td data-k="护栏">'+esc(g.name)+'<div class="tiny dim">'+esc(g.help)+'</div></td>'+
+    '<td data-k="现在的值" class="nowrap">'+esc(g.cur)+'</td>'+
+    '<td data-k="谁定的">'+(g.editable?badge('你能改','ghost'):badge('硬件强制','ghost'))+'</td>'+
+    '<td data-k="最近改动" class="nowrap tiny dim">'+esc(g.changedAt||'出厂默认')+'</td>'+
+    '<td class="r" data-k="操作">'+(g.editable?'<button class="btn sm" data-act="edit-guardrail" data-id="'+g.id+'">修改</button>':'<span class="tiny dim">不可调</span>')+'</td>'+
+    '</tr>').join('');
+}
+function forgoneCard(f,compact){
+  const tone = f.kind==='backup-edge'?'warn':'ghost';
+  return '<div class="card" style="margin-bottom:12px">'+
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+      badge('我主动放弃','ghost',true)+
+      (f.kind==='backup-edge'?badge('触碰备电边缘','warn'):f.kind==='below-threshold'?badge('低于你设的门槛','ghost'):badge('电网费方向相反','ghost'))+
+      '<span class="tiny dim">'+esc(f.window)+'</span>'+
+      '<span style="margin-left:auto" class="num tiny dim">原本能赚 '+eur(f.earn)+'</span></div>'+
+    '<p style="font-size:13px;margin-top:10px">'+esc(f.reason)+'</p>'+
+    (compact?'':'<div class="btn-row" style="margin-top:12px"><button class="btn sm" data-act="forgone-why">如果你希望我做，点这里</button>'+
+      '<button class="btn sm ghost" data-goto="decisions" data-param="D-20260617-002">看这条决策</button></div>')+
+    '</div>';
+}
+
+/* ============================================================================
+   7 · 页面
+   ============================================================================ */
+window.PAGES = {};
+
+/* ---------- ① 今日 ---------- */
+const todayTimeline=[
+  {t:'02:10–04:40',h:'从电网存电 4.2 度',p:'凌晨电价最低，提前买好白天要用的电',e:'+€0.38',state:'done',dec:'D-20260617-001'},
+  {t:'07:05–08:30',h:'光伏先供家里',p:'早上发电直接自用，没有存进电池',e:'—',state:'done'},
+  {t:'11:40–13:20',h:'中午余电上网 1.8 度',p:'电池快满了，发出来的电直接卖掉',e:'+€0.14',state:'done',dec:'D-20260617-003'},
+  {t:'12:00–13:00',h:'放弃一次小套利',p:'价差只有 €0.13，低于你设的门槛',e:'放弃 €0.16',state:'done',dec:'D-20260617-002'},
+  {t:'17:30–18:30',h:'晚峰放电',p:'正在用电池顶晚上的高峰',e:'+€0.42',state:'now',dec:'D-20260617-004'},
+  {t:'19:00–20:00',h:'继续放电',p:'预计放到 20:30，明早备电仍留 9 小时',e:'+€0.44',state:'todo'},
+  {t:'20:00–21:00',h:'放弃再多放 1.2 度',p:'再放下去明早备电会低于你设的 4 小时',e:'放弃 €0.42',state:'todo'},
+  {t:'23:30–01:00',h:'夜间存电',p:'等电价回落到低位再存',e:'预计 +€0.31',state:'todo'}
+];
+PAGES.today={
+  title:'今日',
+  empty:{title:'今天还没有记录',desc:'太阳还没出来，今天的账要等第一度电发出来才有。',action:'reports',actionLabel:'查看昨天的记录'},
+  denied:{title:'这是给安装商和沃太运营看的页面',desc:'你想了解的当地电价规则，我翻译成了人话放在收益页的口径说明里。',action:'去看收益口径说明'},
+  render(){
+    const c=SIM.conclusion, b=SIM.battery, f=SIM.flow;
+    let h=pageHead('今日',
+      '今天预计省 '+eur(c.netEur[0])+'–'+c.netEur[1].toFixed(2)+'，明早的备电够用 '+c.backupHours+' 小时',
+      '<button class="btn" data-act="factory-reset">回退出厂策略</button>'+
+      '<button class="btn" data-goto="plan">查看完整计划</button>');
+
+    h+='<section class="sec"><div class="grid">';
+    h+='<div class="c3"><button class="stat" data-goto="reports" data-anchor="attribution">'+
+       '<span class="k">今日预计净收益 '+ICONS.info+'</span>'+
+       '<span class="v num">'+eur(c.netEur[0])+'<small>– '+c.netEur[1].toFixed(2)+'</small></span>'+
+       '<span class="d good">比出厂策略多赚约 €0.6，区间是因为下午云量不确定</span></button></div>';
+    h+='<div class="c3"><button class="stat" data-goto="battery" data-anchor="guardrails-user">'+
+       '<span class="k">明早备用余量</span><span class="v num">'+c.backupHours+'<small>小时</small></span>'+
+       '<span class="d">你设的底线是 '+b.reserveHours+' 小时，现在留有富余</span></button></div>';
+    h+='<div class="c3 alert"><button class="stat alert" data-goto="battery" data-anchor="budget">'+
+       '<span class="k">本月已用循环</span><span class="v num">'+c.monthUsedEfc.toFixed(1)+'<small>/ '+c.monthBudgetEfc+' 次</small></span>'+
+       '<span class="d warn">已用 '+pct(c.monthPct)+'，过半了，我提醒你一句</span></button></div>';
+    h+='</div></section>';
+
+    h+='<section class="sec">'+card(cardHead('现在的能量流',stampFor('today'))+
+      '<div class="flow">'+
+      '<button class="node" data-goto="household" data-anchor="load-curve"><span class="n">光伏正在发</span>'+
+        '<span class="p num">'+f.pv.toFixed(2)+'<small>度/小时</small></span><span class="f">比上午弱了，太阳在往西走</span></button>'+
+      '<button class="node" data-goto="household" data-anchor="load-curve"><span class="n">电网</span>'+
+        '<span class="p num">'+Math.abs(f.grid).toFixed(2)+'<small>度/小时</small></span><span class="f">正在往电网送电，按 €0.078/度 结算</span></button>'+
+      '<button class="node" data-goto="battery" data-anchor="health"><span class="n">电池</span>'+
+        '<span class="p num">'+f.battery.toFixed(2)+'<small>度/小时</small></span><span class="f">正在放电，手里还有 '+b.soc.toFixed(1)+'% 的电量</span></button>'+
+      '<button class="node" data-goto="household" data-anchor="load-curve"><span class="n">家里在用</span>'+
+        '<span class="p num">'+f.home.toFixed(2)+'<small>度/小时</small></span><span class="f">做饭时段，比平时高一点</span></button>'+
+      '</div>'+
+      '<div class="legend"><span><i class="a"></i>正在发生的</span><span><i class="l"></i>家庭负荷</span><span><i class="b"></i>设备额定</span></div>'+
+      '<p class="card-note">今天电量曲线：最低 '+b.minSocToday.toFixed(1)+'%（凌晨），现在 '+b.soc.toFixed(1)+'%。</p>'+
+      chartLine(socSeries(),{h:150,unit:'电量 %',min:20,max:100,fmt:v=>v.toFixed(0)+'%',
+        aria:'今日 24 小时电池电量曲线，凌晨最低 36.5%，上午充满至 92%，傍晚放电后回落至 62%',
+        marks:[{i:46},{i:70}],band:[56,58],bandTone:'warn',
+        ticks:[{i:0,t:'00:00'},{i:28,t:'07:00'},{i:48,t:'12:00'},{i:72,t:'18:00'},{i:95,t:'23:45'}]})+
+      '<div class="legend"><span><i class="w"></i>12:00–13:00 你不想让我动的时段</span><span><i class="a"></i>电量</span></div>')+'</section>';
+
+    h+='<section class="sec" id="decisions">'+card(
+      '<div class="card-head"><h2>需要你决定</h2><div class="meta">'+SIM.pending.length+' 件 · '+stampFor('today')+'</div></div>'+
+      (SIM.pending.map(p=>'<div class="row"><div class="t">'+esc(p.deadline.split(' ')[1])+' 前</div><div class="b">'+
+        '<div class="h">'+levelBadge(p.level)+'<span>'+esc(p.title)+'</span></div>'+
+        '<p class="p">'+esc(p.ask)+'</p></div>'+
+        '<div class="e"><button class="btn sm primary" data-act="resolve-pending" data-id="'+p.id+'">去确认</button></div></div>').join(''))+
+      '<p class="card-note">有需要你点头的动作我会推给你，平时你什么都不用做。</p>')+'</section>';
+
+    h+='<section class="sec">'+card('<div class="card-head"><h2>今天发生了什么</h2>'+
+      '<div class="meta"><button data-goto="decisions">查看决策日志</button></div></div>'+
+      '<ul class="tl">'+todayTimeline.map(x=>'<li class="'+x.state+'">'+
+        '<div class="tt mono">'+esc(x.t)+'</div>'+
+        '<div class="th">'+esc(x.h)+'</div>'+
+        '<div class="tp">'+esc(x.p)+(x.dec?' · <button class="btn ghost sm" data-goto="decisions" data-param="'+x.dec+'">展开完整依据</button>':'')+'</div>'+
+        '<div class="tp tiny dim">'+esc(x.e)+'</div></li>').join('')+'</ul>')+'</section>';
+
+    const m=modeObj();
+    h+='<section class="sec" id="mode">'+card(cardHead('管家现在的工作方式')+
+      '<div class="kv"><span class="k">当前</span><span class="v">'+modeBadge(S.mode)+'</span></div>'+
+      kv('什么时候变成这样的','2026-06-17 06:10'+(m.reason?'':' · 由你在设置里开启'))+
+      (m.reason?kv('为什么',esc(m.reason)):'')+
+      (m.resume?kv('什么时候能回去',esc(m.resume)):'')+
+      '<div class="btn-row" style="margin-top:14px"><button class="btn" data-goto="collaborate" data-anchor="matrix">看权限分级</button>'+
+      '<button class="btn" data-goto="settings" data-anchor="automation">改工作方式</button></div>')+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ② 计划 ---------- */
+PAGES.plan={
+  title:'计划',
+  empty:{title:'明天的计划还没出来',desc:'电价曲线一般傍晚六点前才确定，我算好就推给你。',action:'today',actionLabel:'看今天的计划'},
+  denied:{title:'这件事只有业主本人能改',desc:'涉及停电备用和电池寿命，安装商不能代改。你可以发起一个申请，让业主一键确认。',action:'发起变更申请'},
+  render(){
+    const total=SIM.priceTomorrow.map((p,i)=>p+SIM.feeByHour[i]);
+    const net=[1.40,2.20];
+    const efc=sum(SIM.planSlots.map(s=>s.efc));
+    let h=pageHead('计划',
+      '明天我打算 2 点到 5 点充电，预计净收益 '+eur(net[0])+'–'+net[1].toFixed(2)+' 欧元',
+      '<button class="btn" data-act="plan-adjust">我要调整</button>'+
+      '<button class="btn primary" data-act="plan-accept">接受这个计划</button>');
+
+    if(S.mode==='shadow') h+='<div class="banner neutral">'+ICONS.shadow+
+      '<div><div class="bt">这是一份建议，我不会真的执行</div><div class="bd">你现在处在我只学不做的阶段，等我攒够两周规律再开启自动。</div></div></div>';
+    if(S.mode==='safe') h+='<div class="banner safe">'+ICONS.degraded+
+      '<div><div class="bt">本页计划已失效</div><div class="bd">设备回到硬件默认，我不再安排任何动作。</div></div></div>';
+
+    h+='<section class="sec" id="head"><div class="grid">'+
+      '<div class="c3">'+card('<span class="k tiny dim">赚多少（区间）</span><div class="stat" style="border:0;padding:0">'+
+        '<span class="v num">'+eur(net[0])+'<small>– '+net[1].toFixed(2)+'</small></span></div>'+
+        '<span class="tiny dim">区间来自下午云量不确定，最坏也不亏</span>')+'</div>'+
+      '<div class="c3">'+card('<span class="k tiny dim">备电够用多久</span><div class="stat" style="border:0;padding:0">'+
+        '<span class="v num">9<small>小时</small></span></div><span class="tiny dim">最低时仍高于你设的 4 小时底线</span>')+'</div>'+
+      '<div class="c3">'+card('<span class="k tiny dim">电池这次跑多少</span><div class="stat" style="border:0;padding:0">'+
+        '<span class="v num">'+efc.toFixed(2)+'<small>次循环</small></span></div><span class="tiny dim">占本月预算的 '+
+        pct(efc/SIM.conclusion.monthBudgetEfc*100)+'</span>')+'</div>'+
+      '</div></section>';
+
+    h+='<section class="sec" id="chart">'+card(
+      '<div class="card-head"><h2>明天 24 小时怎么安排</h2><div class="meta">'+stampFor('plan')+
+      '<span class="seg"><button data-planview="chart" class="'+(S.planView==='chart'?'on':'')+'">看时间轴</button>'+
+      '<button data-planview="table" class="'+(S.planView==='table'?'on':'')+'">看动作表</button></span></div></div>'+
+      (S.planView==='chart'
+        ? chartPrice(SIM.priceTomorrow,SIM.feeByHour,{window:[2,5]})+
+          '<div class="legend"><span><i class="a"></i>我打算动手的时段（02:00–05:00）</span><span><i class="w"></i>合计低于 €0.10 的时段</span><span><i class="b"></i>其余时段</span></div>'+
+          '<p class="card-note">柱高是"零售电价 + 输配电费"的合计，单位欧元每度。中午 12 点合计为 −€0.02，属于负电价。</p>'
+        : '')+
+      (S.planView==='chart'
+        ? '<div style="margin-top:20px">'+chartPvLoad(SIM.pvTomorrow,SIM.loadTomorrow,{h:170})+'</div>'+
+          '<div class="legend"><span><i class="a"></i>预计发电</span><span><i class="d"></i>预计家庭负荷</span></div>'+
+          '<p class="card-note">阴影是预计发电，虚线是家里要用掉的。两条线的差就是要存或要卖的电。</p>'
+        : '')+
+      (S.planView==='table'
+        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>时段</th><th>动作</th><th class="r">预计收益</th><th class="r">循环消耗</th></tr></thead><tbody>'+
+          SIM.planSlots.map(s=>'<tr class="clickable" data-act="plan-slot" data-id="'+s.from+'"><td data-k="时段" class="nowrap mono">'+esc(s.from)+'–'+esc(s.to)+'</td>'+
+          '<td data-k="动作">'+esc(s.label)+'<div class="tiny dim">'+esc(s.detail)+'</div></td>'+
+          '<td data-k="预计收益" class="r num">'+eur(s.expectedEur)+'</td><td data-k="循环消耗" class="r num">'+(s.efc? s.efc.toFixed(2)+' 次':'—')+'</td></tr>').join('')+
+          '</tbody></table></div>'
+        : '')+
+      '<div class="btn-row" style="margin-top:16px">'+
+        '<button class="btn sm" data-act="toggle-gridfee">'+(S.gridFeeView?'收起电网费视角':'打开电网费视角')+'</button>'+
+        '<button class="btn sm" data-goto="household" data-anchor="solar">这个时段判断不可靠</button></div>'+
+      (S.gridFeeView?'<div style="margin-top:14px">'+chartBars(SIM.feeByHour.map((v,i)=>({k:String(i).padStart(2,'0'),v:v,hot:i>=16&&i<21})),{h:150,aria:'输配电费分时柱状图，16 点到 21 点为全天最高'})+
+        '<p class="card-note">输配电费不是全天一样的：早峰 06:00–09:00 是 €0.14，晚峰 16:00–21:00 是 €0.16，其余时段 €0.06–0.08。只看零售电价会被骗。</p></div>':'')
+      )+'</section>';
+
+    h+='<section class="sec" id="actions">'+card(cardHead('我打算做的四件事')+
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>时段</th><th>动作</th><th>我为什么这么排</th><th class="r">预计收益</th><th class="r">循环</th></tr></thead><tbody>'+
+      SIM.planSlots.map(s=>'<tr class="clickable" data-act="plan-slot" data-id="'+esc(s.from)+'">'+
+        '<td data-k="时段" class="nowrap mono">'+esc(s.from)+'–'+esc(s.to)+'</td>'+
+        '<td data-k="动作">'+esc(s.label)+'<div class="tiny dim">'+esc(s.detail)+'</div></td>'+
+        '<td data-k="我为什么这么排" class="tiny dim">'+esc(s.source)+'</td>'+
+        '<td data-k="预计收益" class="r num">'+eur(s.expectedEur)+'</td>'+
+        '<td data-k="循环" class="r num">'+(s.efc?s.efc.toFixed(2):'—')+'</td></tr>').join('')+
+      '</tbody></table></div>'+
+      '<div class="btn-row" style="margin-top:14px"><button class="btn" data-act="plan-accept">接受这个计划</button>'+
+      '<button class="btn" data-act="plan-adjust">我要调整</button>'+
+      '<button class="btn" data-act="plan-old">明天按老办法来</button>'+
+      '<button class="btn" data-act="plan-lock">锁单，今天别再改</button></div>')+'</section>';
+
+    h+='<section class="sec" id="forgone">'+card(cardHead('我主动放弃的机会',
+      '<span class="tiny dim">弃权也要有理由，不能沉默</span>'))+
+      SIM.forgone.map(f=>forgoneCard(f)).join('')+'</section>';
+
+    h+='<section class="sec" id="revisions">'+card(cardHead('今天临时改过什么')+
+      SIM.revisions.map(r=>'<div class="row"><div class="t mono">'+esc(r.at)+'</div><div class="b">'+
+        '<div class="h">'+esc(r.what)+'</div><p class="p">'+esc(r.why)+'</p></div></div>').join('')+
+      '<p class="card-note">一切按昨晚那张计划走，没有偏差时这里会是空的。</p>')+'</section>';
+
+    const c=SIM.planConfidence;
+    h+='<section class="sec" id="confidence">'+card(cardHead('这份计划有多可靠')+
+      '<div class="kv"><span class="k">把握程度</span><span class="v">'+esc(c.level)+' · '+c.value.toFixed(2)+'</span></div>'+
+      kv('为什么不是满分',esc(c.note))+
+      kv('最没把握的一段',esc(c.weak))+
+      '<div class="btn-row" style="margin-top:12px"><button class="btn sm" data-goto="household" data-anchor="solar">看看我学到了什么</button></div>')+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ③ 决策 ---------- */
+PAGES.decisions={
+  title:'决策',
+  empty:{title:'还没有决策记录',desc:'我在影子期只看不做，等你开启自动后这里会逐条记下来。',action:'settings',actionLabel:'去开启自动模式'},
+  denied:{title:'这个确认要业主本人点',desc:'我可以把提议推给业主，他点一下就好。',action:'推送给业主'},
+  render(){
+    const fl=S.filters.decisions;
+    const list=SIM.decisions.filter(d=>fl==='all'||d.action===fl);
+    const overridden=SIM.decisions.filter(d=>d.result==='overridden').length;
+    let h=pageHead('决策','近 14 天里有 46 条决策，其中 '+overridden+' 条被你推翻');
+    h+='<section class="sec">'+card(
+      '<div class="filters">'+
+      '<span class="tiny dim">动作</span><span class="seg">'+
+        [['all','全部'],['grid-charge','存电'],['discharge','放电'],['export','上网'],['skip','放弃']].map(x=>
+          '<button data-filter="decisions" data-value="'+x[0]+'" class="'+(fl===x[0]?'on':'')+'">'+x[1]+'</button>').join('')+'</span>'+
+      '<span class="sp tiny dim">共 '+list.length+' 条（演示 '+SIM.decisions.length+' 条，其余按月抽样）</span></div>'+
+      '<div class="list">'+list.map(d=>'<div class="row clickable" data-goto="decisions" data-param="'+d.id+'">'+
+        '<div class="t mono">'+esc(d.date.slice(5))+' '+esc(d.at)+'</div>'+
+        '<div class="b"><div class="h">'+esc(d.actionLabel)+resultBadge(d)+
+          (d.uncertaintyDeclared?badge('声明不知道','ghost'):'')+
+          (d.mode!=='auto'&&d.mode!=='shadow'&&d.mode!=='advisory'?modeBadge(d.mode):'')+'</div>'+
+        '<p class="p">'+esc(d.summary)+'</p></div>'+
+        '<div class="e"><div class="v num '+(d.impactEur>0?'pos':d.impactEur<0?'neg':'dim')+'">'+
+          (d.impactEur?eur(d.impactEur,{sign:true}):'—')+'</div>'+
+        (d.outcome?'<div class="m num">预计 '+eur(d.outcome.predictedEur)+' · 实际 '+eur(d.outcome.actualEur)+'</div>':'')+
+        '</div></div>').join('')+'</div>')+'</section>';
+    return h;
+  }
+};
+PAGES._decisionDetail={
+  title:'决策详情',
+  render(){
+    const d=SIM.decisions.find(x=>x.id===S.param)||SIM.decisions[0];
+    const sub = d.action==='grid-charge'?'为了赶上早上的高价时段，我在凌晨存了电'
+      : d.action==='discharge'?'晚峰是全天最贵的一段，我让电池顶上去'
+      : d.action==='export'?'中午的电不发出去就浪费了'
+      : '这一条我选择了不动手';
+    let h=pageHead('决策详情',sub,'<button class="btn" data-goto="decisions">返回决策日志</button>',
+      '<div class="crumb-time mono">'+esc(d.id)+' · '+esc(d.date)+' '+esc(d.at)+' · '+esc(d.actionLabel)+'</div>');
+
+    h+='<section class="sec" id="l1">'+card(cardHead('一句话说明白')+
+      '<p style="font-size:19px;line-height:1.5">'+esc(d.l1)+'</p>'+
+      '<div class="btn-row" style="margin-top:12px">'+resultBadge(d)+modeBadge(d.mode)+
+      (d.impactEur?badge('收益影响 '+eur(d.impactEur,{sign:true}),d.impactEur>0?'ok':'warn'):badge('无收益影响','ghost'))+'</div>')+'</section>';
+
+    h+='<section class="sec" id="l2">'+card(cardHead('为什么这么做')+
+      '<p>'+esc(d.l2)+'</p>'+
+      '<div class="card-head" style="margin-top:16px"><h2>我看了哪些东西</h2></div>'+
+      '<ul style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2)">'+
+      d.evidence.map(e=>'<li>'+esc(e)+'</li>').join('')+'</ul>')+'</section>';
+
+    h+='<section class="sec" id="l3">'+card('<div class="card-head"><h2>再往深一层</h2>'+
+      '<div class="meta">这一层可能出现专业数值，默认不展开</div></div>'+
+      '<p style="font-size:13px">'+esc(d.l3)+'</p>'+
+      '<details class="deep"><summary>展开深水区数值（含单位与来源）</summary><div class="deep-body">'+
+      '<div class="kv"><span class="k">动作编号</span><span class="v mono">'+esc(d.id)+'</span></div>'+
+      kv('动作类型','<span class="mono">'+esc(d.action)+'</span>')+
+      kv('执行时的运行模式','<span class="mono">'+esc(d.mode)+'</span>')+
+      kv('往返效率（充进去再放出来）','0.90')+
+      kv('电池折旧口径','€0.105 / 度（按 6000 次质保循环折算）')+
+      kv('输配电费口径','分时：早峰 €0.14、晚峰 €0.16、其余 €0.06–0.08')+
+      kv('本次等效满循环',''+(d.action==='skip'?'0.00':'0.42')+' 次（占质保上限的 0.01%）')+
+      '<p class="card-note">上面这些数只在你想看的时候出现，平时我会说人话。</p>'+
+      '</div></details>')+'</section>';
+
+    if(d.outcome){
+      const o=d.outcome;
+      h+='<section class="sec" id="outcome">'+card(cardHead('事后结果：说好的和实际发生的')+
+        '<div class="grid">'+
+        '<div class="c3"><span class="k tiny dim">我预计</span><div class="num" style="font-size:24px">'+eur(o.predictedEur)+'</div></div>'+
+        '<div class="c3"><span class="k tiny dim">实际发生</span><div class="num" style="font-size:24px">'+eur(o.actualEur)+'</div></div>'+
+        '<div class="c3"><span class="k tiny dim">差多少</span><div class="num '+(o.delta<0?'neg':'pos')+'" style="font-size:24px">'+eur(o.delta,{sign:true})+'</div></div>'+
+        '<div class="c3"><span class="k tiny dim">三向对比</span><div class="tiny" style="margin-top:6px">'+
+        'vs 什么都不做 <b>+€0.18</b><br>vs 出厂策略 <b>+€0.11</b><br>vs 理论最优 <b>−€0.07</b></div></div>'+
+        '</div>')+'</section>';
+    }
+    if(d.overridden){
+      h+='<section class="sec">'+card(cardHead('你推翻过这一条')+
+        kv('谁推翻的',esc(d.overridden.by))+kv('什么时候',esc(d.overridden.at))+
+        kv('你给的理由',esc(d.overridden.reason))+
+        kv('范围',d.overridden.scope==='once'?'就这一次':'以后都按你说的来')+
+        '<p class="card-note">我把它写进偏好了吗？写了。夜间静默时段现在是 23:00–07:00，我不会再在这个时段安排动作。</p>')+'</section>';
+    }
+    if(d.takenOver){
+      h+='<section class="sec">'+card(cardHead('有人接管过这一条')+
+        kv('接管人',esc(d.takenOver.by))+kv('什么时候',esc(d.takenOver.at))+kv('说明',esc(d.takenOver.note))+
+        '<div class="btn-row" style="margin-top:12px"><button class="btn sm" data-goto="incidents" data-param="INC-20260522-001">查看事故简报</button></div>')+'</section>';
+    }
+    if(d.uncertaintyDeclared){
+      h+='<section class="sec">'+card(cardHead('我承认过我不知道')+
+        '<p style="font-size:13px">'+esc(d.uncertaintyDeclared)+'</p>'+
+        '<p class="card-note">我选择说出不确定，而不是按平均值赌一把。</p>')+'</section>';
+    }
+
+    h+='<section class="sec" id="override">'+card(cardHead('你对这一条有意见吗')+
+      '<p style="font-size:13px;color:var(--ink-2)">告诉我一次，或者告诉我以后都这么办。</p>'+
+      '<div class="btn-row" style="margin-top:12px">'+
+      '<button class="btn" data-act="disagree" data-id="'+esc(d.id)+'">这个决定我不同意</button></div>')+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ④ 异常 ---------- */
+PAGES.incidents={
+  title:'异常',
+  empty:{title:'最近没有异常',desc:'过去 30 天里没有停电、没有电池告警，也没有数据中断。',action:'today',actionLabel:'查看历史事件'},
+  denied:{title:'只能看汇总，不能看单户明细',desc:'单户的用能曲线属于个人敏感数据。需要查看请走工单流程并留下授权记录。',action:'提交查看申请'},
+  render(){
+    const fl=S.filters.incidents;
+    const levels=['all','L3','L2','L1','L0'];
+    const list=SIM.incidents.filter(i=>fl==='all'||i.level===fl);
+    const open=SIM.incidents.filter(i=>i.status==='open');
+    let h=pageHead('异常','有 '+open.length+' 件事需要处理，其中 0 件紧急');
+    h+='<section class="sec">'+card(
+      '<div class="filters"><span class="tiny dim">分级</span><span class="seg">'+
+      levels.map(l=>'<button data-filter="incidents" data-value="'+l+'" class="'+(fl===l?'on':'')+'">'+
+        (l==='all'?'全部':l+' 及以上')+'</button>').join('')+'</span>'+
+      '<span class="sp tiny dim">L0 记录默认收起，不会打扰你</span></div>'+
+      '<div class="list">'+list.sort((a,b)=>b.date.localeCompare(a.date)).map(i=>'<div class="row clickable" data-goto="incidents" data-param="'+i.id+'">'+
+        '<div class="t mono">'+esc(i.date.slice(5))+' '+esc(i.at.split(' ')[1])+'</div>'+
+        '<div class="b"><div class="h">'+levelBadge(i.level)+'<span>'+esc(i.title)+'</span>'+
+        (i.status==='open'?badge('待处理','warn',true):badge('已闭环','ok'))+'</div>'+
+        '<p class="p">'+esc(i.briefing.what)+'</p></div>'+
+        '<div class="e"><div class="m">'+esc(i.recovery)+'</div><div class="m tiny dim">'+esc(i.owner)+'</div></div></div>').join('')+'</div>')+'</section>';
+    return h;
+  }
+};
+PAGES._incidentsDetail={
+  title:'事故简报',
+  render(){
+    const i=SIM.incidents.find(x=>x.id===S.param)||SIM.incidents[0];
+    const b=i.briefing;
+    let h=pageHead('事故简报','发生于 '+esc(i.at.slice(5,16))+'，当前状态：'+esc(i.recovery),
+      '<button class="btn" data-goto="incidents">返回事件列表</button>'+
+      '<button class="btn" data-act="export-briefing">导出这份简报</button>',
+      '<div class="crumb-time mono">'+esc(i.id)+' · '+esc(i.owner)+' · 谁来决定：'+
+      (i.whoDecides==='user'?'你':i.whoDecides==='installer'?'安装商':'我自动处理')+'</div>');
+    h+='<section class="sec">'+card(cardHead('六要素简报',
+      '<div class="meta">'+levelBadge(i.level)+(i.status==='open'?badge('待处理','warn'):badge('已闭环','ok'))+'</div>')+
+      '<dl class="dl">'+
+      '<dt>出了什么事</dt><dd>'+esc(b.what)+'</dd>'+
+      '<dt>什么时候</dt><dd>'+esc(b.when)+'</dd>'+
+      '<dt>谁在处理</dt><dd>'+esc(b.who)+'</dd>'+
+      '<dt>影响是什么</dt><dd>'+esc(b.impact)+'</dd>'+
+      '<dt>已经做了什么决定</dt><dd>'+esc(b.decision)+'</dd>'+
+      '<dt>接下来会怎样</dt><dd>'+esc(b.next)+'</dd>'+
+      '</dl>'+
+      '<p class="card-note">这份简报是给你或人工客服看的，接手的人不用从零排查。</p>')+'</section>';
+
+    h+='<section class="sec" id="timeline">'+card(cardHead('处置时间线')+
+      '<ul class="tl">'+i.timeline.map(t=>'<li class="'+(t.who==='管家'?'agent':'done')+'">'+
+        '<div class="tt mono">'+esc(t.t)+' · '+esc(t.who)+'</div>'+
+        '<div class="th">'+esc(t.what)+'</div></li>').join('')+'</ul>')+'</section>';
+
+    h+='<section class="sec" id="closure">'+card(cardHead('这件事以后怎么办')+
+      '<p style="font-size:13px;color:var(--ink-2)">如果是系统性问题，别只让我处理这一次。</p>'+
+      '<div class="btn-row" style="margin-top:12px">'+
+      '<button class="btn" data-act="closure" data-scope="once">就这一次，处理完算了</button>'+
+      '<button class="btn" data-act="closure" data-scope="class">这是系统性问题，改规则</button></div>')+'</section>';
+
+    if(i.status==='open'){
+      h+='<section class="sec" id="recovery">'+card(cardHead('恢复条件')+
+        '<p style="font-size:13px">'+esc(b.next)+'</p>'+
+        '<div class="btn-row" style="margin-top:12px"><button class="btn primary" data-act="resolve-incident" data-id="'+esc(i.id)+'">我确认，可以让它恢复</button></div>')+'</section>';
+    }
+    return h;
+  }
+};
+
+/* ---------- ⑤ 家庭 ---------- */
+PAGES.household={
+  title:'家庭',
+  empty:{title:'我还在学',desc:'才观察了 3 天，规律要攒够两周才敢下结论。',action:'today',actionLabel:'先看点别的'},
+  denied:{title:'这件事只有业主本人能改',desc:'这是你家的私人画像，安装商只能看汇总，不能看到单条规律。',action:'发起变更申请'},
+  render(){
+    const p=SIM.profile, s=SIM.solar;
+    let h=pageHead('家庭','我已经观察了 '+p.observedDays+' 天，学到 '+p.patterns+' 条关于你家的规律',
+      '<button class="btn" data-act="all-correct">全部正确</button>'+
+      '<button class="btn" data-act="correct" >我要修改</button>');
+
+    h+='<section class="sec" id="profile"><div class="grid">'+
+      '<div class="c6">'+card(cardHead('我确定的事实','<span class="tiny dim">这些是你自己告诉我的或我反复验证过的</span>')+
+        p.facts.map(f=>'<div class="row"><div class="b"><div class="h">'+esc(f.k)+'</div><p class="p">'+esc(f.v)+'</p></div></div>').join(''))+'</div>'+
+      '<div class="c6">'+card(cardHead('我的猜测（欢迎纠正）','<span class="tiny dim">每条都能点"不对"</span>')+
+        p.guesses.map((g,idx)=>'<div class="row"><div class="b"><div class="h"><span>'+esc(g.k)+'</span>'+
+          badge('把握 '+(g.conf*100).toFixed(0)+'%',g.conf>=0.85?'ok':'ghost')+'</div>'+
+          '<p class="p">'+esc(g.v)+'</p>'+
+          (g.editOpen?'<div style="margin-top:10px"><div class="field"><label for="fix-'+idx+'">实际是什么</label>'+
+            '<input type="text" id="fix-'+idx+'" placeholder="用你自己的话说就行"><span class="help">我会立刻告诉你这条改动会带来什么变化。</span></div>'+
+            '<div class="btn-row"><button class="btn sm primary" data-act="save-correct" data-idx="'+idx+'">保存</button>'+
+            '<button class="btn sm ghost" data-act="cancel-correct">取消</button></div></div>':'')+
+          '</div><div class="e"><button class="btn sm ghost" data-act="correct-item" data-idx="'+idx+'">不对</button></div></div>').join(''))+'</div>'+
+      '</div></section>';
+
+    h+='<section class="sec" id="load-curve">'+card(
+      '<div class="card-head"><h2>24 小时用电习惯</h2><div class="meta">'+stampFor('household')+
+      '<span class="seg"><button data-curve="workday" class="'+(S.houseCurve==='workday'?'on':'')+'">工作日</button>'+
+      '<button data-curve="weekend" class="'+(S.houseCurve==='weekend'?'on':'')+'">周末</button></span></div></div>'+
+      chartLine(S.houseCurve==='workday'
+        ? [0.32,0.31,0.30,0.30,0.33,0.48,0.92,1.05,0.80,0.60,0.55,0.62,0.70,0.66,0.58,0.62,0.85,1.10,1.24,1.16,0.98,0.80,0.58,0.40].map((v,i)=>({i:i,v:v}))
+        : [0.40,0.38,0.36,0.36,0.38,0.45,0.60,0.72,0.95,1.10,1.22,1.30,1.28,1.15,1.02,0.98,1.05,1.18,1.30,1.22,1.05,0.88,0.66,0.48].map((v,i)=>({i:i,v:v})),
+        {h:170,unit:'度 / 小时',max:1.4,min:0,fmt:v=>v.toFixed(1),
+         aria:'家庭 24 小时负荷曲线，早晚两个高峰，中午有个小平台',
+         ticks:[{i:0,t:'00:00'},{i:6,t:'06:00'},{i:12,t:'12:00'},{i:18,t:'18:00'},{i:23,t:'23:00'}]})+
+      '<div class="legend"><span><i class="a"></i>'+(S.houseCurve==='workday'?'工作日':'周末')+'平均负荷</span></div>'+
+      '<p class="card-note">'+(S.houseCurve==='workday'
+        ? '工作日早晚两个尖峰：07:00 起床、18:00–20:00 做饭与热水。'
+        : '周末整体抬高约三成，中午也有一个平台，说明白天有人在家。')+'</p>')+'</section>';
+
+    h+='<section class="sec" id="appliances">'+card(cardHead('家里的大功率设备','<span class="tiny dim">能不能挪，决定我能省多少</span>')+
+      table([{t:'设备'},{t:'功率'},{t:'一天用多少'},{t:'能不能挪动'}],
+        SIM.loads.map(l=>({cells:[esc(l.name),'<span class="num">'+esc(l.power)+'</span>',esc(l.daily),esc(l.shift)]}))))+'</section>';
+
+    h+='<section class="sec" id="solar"><div class="grid">'+
+      '<div class="c8">'+card(cardHead('你家的光伏是什么样的')+
+        kv('朝向与形式',esc(s.eastWest))+
+        kv('今天发电高峰',esc(s.peakToday))+
+        '<div style="margin-top:14px">'+table([{t:'季节'},{t:'一天大概发多少'},{t:'我要注意什么'}],
+          s.seasons.map(x=>({cells:[esc(x.name),'<span class="num">'+esc(x.gen)+'</span>',esc(x.note)]})))+'</div>')+'</div>'+
+      '<div class="c4">'+card(cardHead('预报把握程度')+
+        '<div class="stat" style="border:0;padding:0"><span class="v num">'+s.confidence.toFixed(2)+'</span>'+
+        '<span class="d">下调过一次，因为 6 月 16 日预报偏了 29%</span></div>'+
+        '<p class="card-note">把握越低，我给的收益区间就越宽，不会按平均值骗你。</p>')+'</div>'+
+      '</div></section>';
+
+    h+='<section class="sec" id="outage">'+card(cardHead('停电这件事','<span class="tiny dim">风险等级：'+esc(SIM.outage.riskLevel)+'</span>')+
+      table([{t:'什么时候'},{t:'停了多久'},{t:'为什么'}],
+        SIM.outage.history.map(x=>({cells:['<span class="mono">'+esc(x.at)+'</span>','<span class="num">'+esc(x.dur)+'</span>',esc(x.cause)]})))+
+      '<p class="card-note">'+esc(SIM.outage.note)+'</p>'+
+      '<div class="btn-row" style="margin-top:12px"><button class="btn" data-goto="battery" data-anchor="guardrails-user">提高备电预留</button></div>')+'</section>';
+
+    h+='<section class="sec" id="correct">'+card(cardHead('纠正入口')+
+      '<p style="font-size:13px;color:var(--ink-2)">我猜错的地方，你点一下我就改。改完我会立刻告诉你这条改动会带来什么变化。</p>'+
+      '<div class="btn-row" style="margin-top:12px"><button class="btn" data-act="all-correct">全部正确</button>'+
+      '<button class="btn" data-act="correct">我要修改</button></div>')+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ⑥ 电池 ---------- */
+PAGES.battery={
+  title:'电池',
+  empty:{title:'我还在学',desc:'这块电池才用了一个月，样本太少，我下个月给你一份完整的。',action:'today',actionLabel:'先看点别的'},
+  denied:{title:'这件事只有业主本人能改',desc:'涉及停电备用和电池寿命，安装商不能代改。你可以发起一个申请，让业主一键确认。',action:'发起变更申请'},
+  render(){
+    const b=SIM.battery;
+    const userG=SIM.guardrails.filter(g=>g.editable), sysG=SIM.guardrails.filter(g=>!g.editable);
+    let h=pageHead('电池','按现在的用法，这块电池预计还能用 '+b.lifeYears+' 年');
+
+    h+=staleNote();
+    h+='<section class="sec" id="health"><div class="grid">'+
+      '<div class="c3">'+card('<span class="k tiny dim">还能用多久</span><div class="stat" style="border:0;padding:0">'+
+        '<span class="v num">'+b.lifeYears+'<small>年</small></span></div><span class="tiny dim">按 6000 次质保循环与现在的用法折算</span>')+'</div>'+
+      '<div class="c3">'+card('<span class="k tiny dim">现在的健康度</span><div class="stat" style="border:0;padding:0">'+
+        '<span class="v num">'+b.soh.toFixed(1)+'<small>%</small></span></div><span class="tiny dim">去年同期 98.1%，一年掉了 0.7 个点</span>')+'</div>'+
+      '<div class="c3">'+card('<span class="k tiny dim">手里的电量</span><div class="stat" style="border:0;padding:0">'+
+        '<span class="v num">'+b.soc.toFixed(1)+'<small>%</small></span></div><span class="tiny dim">今天最低到过 '+b.minSocToday.toFixed(1)+'%，没有越过底线</span>')+'</div>'+
+      '<div class="c3">'+card('<span class="k tiny dim">电池温度</span><div class="stat" style="border:0;padding:0">'+
+        '<span class="v num">'+b.tempC.toFixed(1)+'<small>摄氏度</small></span></div><span class="tiny dim">单体温差 '+b.cellDeltaC.toFixed(1)+'，正常</span>')+'</div>'+
+      '</div>'+
+      chartLine(socSeries(),{h:150,unit:'今日电量 %',min:20,max:100,fmt:v=>v.toFixed(0)+'%',
+        aria:'今日电池电量曲线',band:[56,58],bandTone:'warn',marks:[{i:46}],
+        ticks:[{i:0,t:'00:00'},{i:48,t:'12:00'},{i:72,t:'18:00'},{i:95,t:'23:45'}]})+'</section>';
+
+    h+='<section class="sec" id="budget">'+card(cardHead('循环预算账本','<span class="tiny dim">每一格都是电池的寿命</span>')+
+      SIM.cycle.map(cycleCard).join('')+
+      '<p class="card-note">本月已用 '+pct(SIM.cycle[0].used/SIM.cycle[0].budget*100)+
+      '，超过 60% 我就只保证自发自用，不再做激进套利。去年 12 月越线过一次，原因是连着一周的负电价。</p>')+'</section>';
+
+    h+='<section class="sec" id="guardrails-user">'+card(cardHead('你能改的红线','<span class="tiny dim">'+userG.length+' 条</span>')+
+      table([{t:'护栏'},{t:'现在的值'},{t:'谁定的'},{t:'最近改动'},{t:'操作',r:true}],
+        userG.map(g=>({__click:'edit-guardrail',__id:g.id,cells:[
+          esc(g.name)+'<div class="tiny dim">'+esc(g.help)+'</div>',
+          '<span class="nowrap">'+esc(g.cur)+'</span>',
+          badge('你能改','ghost'),
+          '<span class="nowrap tiny dim">'+esc(g.changedAt||'出厂默认')+'</span>',
+          '<button class="btn sm" data-act="edit-guardrail" data-id="'+g.id+'">修改</button>']}))))+'</section>';
+
+    h+='<section class="sec" id="guardrails-system">'+card(cardHead('不能改的红线','<span class="tiny dim">硬件层面的保护，谁都不能越</span>')+
+      table([{t:'护栏'},{t:'现在的值'},{t:'为什么不能改'}],
+        sysG.map(g=>({cells:[esc(g.name),'<span class="nowrap">'+esc(g.cur)+'</span>',
+          '<span class="tiny dim">'+esc(g.help)+'，来自设备说明书</span>']}))))+'</section>';
+
+    h+='<section class="sec" id="changes">'+card(cardHead('红线改动记录','<span class="tiny dim">改过的都留在这里，不删不盖</span>')+
+      table([{t:'改了什么'},{t:'什么时候'},{t:'谁提的'},{t:'状态'}],
+        SIM.guardrailChanges.map(c=>({cells:[esc(c.what),'<span class="mono tiny">'+esc(c.at)+'</span>',esc(c.by),
+          c.status==='pending'?badge('等你确认','warn',true):badge('已生效','ok')]})))+
+      '<p class="card-note">你没有改过的项用的是市场默认值，改过的记录都会留在这一页。</p>')+'</section>';
+
+    h+='<section class="sec" id="alerts">'+card(cardHead('告警与保护')+
+      table([{t:'什么时候'},{t:'级别'},{t:'发生了什么'},{t:'状态'}],
+        SIM.alerts.map(a=>({cells:['<span class="mono tiny">'+esc(a.at)+'</span>',levelBadge(a.level),esc(a.title),esc(a.state)]}))))+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ⑩ 市场 ---------- */
+PAGES.markets={
+  title:'市场',
+  empty:{title:'还没有配置任何市场',desc:'先在市场列表里选一个地区，我才能知道当地的电价和电网费怎么算。',action:'settings',actionLabel:'新建市场配置'},
+  denied:{title:'这是给安装商和沃太运营看的页面',desc:'你想了解的当地电价规则，我翻译成了人话放在收益页的口径说明里。',action:'去看收益口径说明'},
+  render(){
+    const need=SIM.markets.filter(m=>m.review).length;
+    let h=pageHead('市场','当前覆盖 '+SIM.markets.length+' 个市场，其中 '+need+' 个需要复核');
+    h+='<section class="sec" id="list">'+card(cardHead('策略包清单')+
+      table([{t:'市场'},{t:'电价机制'},{t:'健康状态'},{t:'活跃用户',r:true},{t:'版本',r:true}],
+        SIM.markets.map(m=>({__click:'open-market',__id:m.id,cells:[
+          '<b>'+esc(m.name)+'</b> <span class="tiny dim mono">'+esc(m.code)+'</span>',
+          esc(m.mechanism),
+          m.review?badge('需要复核','warn',true):(m.health==='草稿'?badge('草稿','ghost'):badge('健康','ok')),
+          '<span class="num">'+m.users+'</span>','<span class="mono tiny">'+esc(m.version)+'</span>']}))))+'</section>';
+
+    if(!S.param){
+      h+='<p class="card-note">点任意一行看这个市场的电价、电网费、上网规则、合规约束与默认红线。</p>';
+      return h;
+    }
+    const m=SIM.markets.find(x=>x.id===S.param)||SIM.markets[0];
+    h+='<section class="sec" id="tariff">'+card(cardHead(m.name+' · 策略包 '+m.version,
+      '<div class="meta">'+(m.fuse?badge('已熔断','danger'):badge('正常','ok'))+
+      '<button data-act="edit-market">编辑</button></div>')+
+      '<div class="grid"><div class="c6">'+
+      kv('电价机制',esc(m.mechanism))+kv('电网费',esc(m.fee))+kv('上网结算价',esc(m.export))+
+      kv('活跃用户',m.users+' 户')+kv('策略包版本','<span class="mono">'+esc(m.version)+'</span>')+
+      '</div><div class="c6">'+
+      '<div class="card-head"><h2>默认红线</h2></div>'+
+      m.defaults.map(d=>'<div class="kv"><span class="k">'+esc(d)+'</span><span class="v">'+badge('市场默认','ghost')+'</span></div>').join('')+
+      '</div></div>')+'</section>';
+
+    h+='<section class="sec" id="rules">'+card(cardHead('规则变更')+
+      (m.ruleChange
+        ? kv('什么时候','<span class="mono">'+esc(m.ruleChange.at)+'</span>')+
+          kv('变了什么',esc(m.ruleChange.summary))+
+          kv('影响多少户',m.ruleChange.affected+' 户')+
+          kv('有没有触发复核',m.ruleChange.reviewTriggered?badge('已触发','warn'):badge('未触发','ghost'))+
+          '<div class="btn-row" style="margin-top:12px"><button class="btn" data-act="market-review">触发存量用户复核</button></div>'
+        : '<p class="tiny dim">这个市场近 90 天没有规则变更。</p>')
+      )+'</section>';
+
+    h+='<section class="sec" id="compliance">'+card(cardHead('合规约束')+
+      '<ul style="margin:0;padding-left:18px;font-size:13px;color:var(--ink-2)">'+
+      m.compliance.map(c=>'<li>'+esc(c)+'</li>').join('')+'</ul>'+
+      '<p class="card-note">这些是当地法规与并网要求，产品不能绕过，只能适配。</p>')+'</section>';
+
+    h+='<section class="sec" id="fuse">'+card(cardHead('全局熔断')+
+      '<p style="font-size:13px;color:var(--ink-2)">熔断后，这个市场的全部家庭会切到保守模式（只保证自发自用与备电），并收到一条说明。影响超过 50 户需要二次确认。</p>'+
+      '<div class="btn-row" style="margin-top:12px">'+
+      (m.fuse?'<button class="btn" data-act="unfuse-market">解除熔断</button>'
+             :'<button class="btn danger" data-act="fuse-market" data-id="'+esc(m.id)+'">熔断这个市场</button>')+
+      '<span class="tiny dim" style="align-self:center">当前影响 '+m.users+' 户</span></div>')+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ⑪ 收益 ---------- */
+PAGES.reports={
+  title:'收益',
+  empty:{title:'本月的账还没算完',desc:'这个月才过了 4 天，样本太少，我下个月初给你一份完整的。',action:'collaborate',actionLabel:'看上个季度'},
+  denied:{title:'只能看汇总，不能看单户明细',desc:'单户的用能曲线属于个人敏感数据。需要查看请走工单流程并留下授权记录。',action:'提交查看申请'},
+  render(){
+    const keys=Object.keys(SIM.reports).sort().reverse();
+    const r=SIM.reports[S.reportPeriod]||SIM.reports[keys[0]];
+    const sumItems=sum(r.items.map(x=>x.v));
+    let h=pageHead('收益','本月净省 €'+r.net.toFixed(0)+'，比出厂策略多省 €'+r.vsFactory.toFixed(0),
+      '<span class="seg">'+keys.map(k=>'<button data-report="'+k+'" class="'+(S.reportPeriod===k?'on':'')+'">'+
+        SIM.reports[k].label.replace('2026 年 ','')+'</button>').join('')+'</span>'+
+      '<button class="btn" data-act="export-report">导出明细</button>');
+
+    h+='<section class="sec" id="compare">'+card(
+      cardHead(r.label+' · 四种做法放在一起','<span class="tiny dim">截至 '+r.until+'</span>')+
+      '<div class="grid">'+r.columns.map(c=>'<div class="c4">'+
+        '<span class="k tiny dim">'+esc(c.k)+'</span>'+
+        '<div class="num" style="font-size:26px;font-weight:600;margin-top:6px">'+(c.v?eur(c.v):'€0.00')+'</div>'+
+        (c.k==='管家'?badge('你正在用的','acc'):'')+'</div>').join('')+'</div>'+
+      chartBars(r.columns.map(c=>({k:c.k,v:c.v,hot:c.k==='管家'})),
+        {h:190,aria:'四种做法的月度净省对比柱状图：什么都不做 0 欧元，出厂策略 64 欧元，管家 77 欧元，理论最优 96 欧元'})+
+      '<p class="card-note">"什么都不做"指不装电池也不改任何习惯；"出厂策略"指自发自用优先的默认设置；"理论最优"是事后算出来的上限，任何人做不到。</p>')+'</section>';
+
+    h+='<section class="sec" id="attribution">'+card(
+      cardHead('这 '+eur(r.net)+' 是怎么来的','<span class="tiny dim">正项 5 条、负项 2 条，一项都不藏</span>')+
+      table([{t:'收益构成'},{t:'金额',r:true},{t:'说明'}],
+        r.items.map(it=>({cells:[
+          esc(it.k),'<span class="num '+(it.v<0?'neg':it.v>0?'pos':'dim')+'">'+eur(it.v,{sign:true})+'</span>',
+          '<span class="tiny dim">'+esc(it.note||'—')+'</span>']}))
+        .concat([{cells:['<b>净省</b>','<b class="num">'+eur(sumItems)+'</b>','<span class="tiny dim">上面 8 项相加，与第一栏的 ¥ '+eur(r.net)+' 一致</span>']}]))+
+      '<div class="btn-row" style="margin-top:12px">'+
+      '<button class="btn sm" data-goto="battery" data-anchor="budget">看电池折旧是怎么算的</button>'+
+      '<button class="btn sm" data-act="method">展开口径说明</button></div>')+'</section>';
+
+    h+='<section class="sec" id="trend">'+card(cardHead('近 5 个月趋势',
+      '<span class="seg">'+['month','quarter','year'].map(x=>'<button data-trend="'+x+'" class="'+(S.trendRange===x?'on':'')+'">'+
+        ({month:'按月',quarter:'按季',year:'按年'}[x])+'</button>').join('')+'</span>')+
+      chartBars(SIM.reportTrend.map(t=>({k:t.m.slice(5),v:t.v,hot:t.m===S.reportPeriod})),
+        {h:180,aria:'近五个月的净省趋势柱状图：1 月 83.50，2 月 71.20，3 月 54.10，4 月 62.40，5 月 77.00 欧元'})+
+      '<p class="card-note">'+(S.trendRange==='month'?'按月看，冬季套利多、夏季光伏自用多，两头都能赚钱。'
+        :S.trendRange==='quarter'?'按季看，2026 年第 2 季度（未走完）目前 139.40 欧元。'
+        :'按年看，过去 12 个月累计净省 872.10 欧元。')+'</p>'+
+      '<p class="card-note">3 月比 1 月少赚 29 欧元，主要因为你的循环预算在 3 月被我用掉了一部分来保证备电，没有拿去套利。</p>')+'</section>';
+
+    if(S.role!=='owner'){
+      h+='<section class="sec" id="contract">'+card(cardHead('合同体检建议','<span class="tiny dim">仅安装商与沃太运营可见</span>')+
+        kv('当前合同',esc(SIM.contract.retailer)+' · 到 '+esc(SIM.contract.until))+
+        kv('还剩多久',SIM.contract.monthsLeft+' 个月')+
+        '<p style="font-size:13px;margin-top:10px">'+esc(SIM.contract.note)+'</p>'+
+        '<div class="btn-row" style="margin-top:12px"><button class="btn" data-goto="markets" data-param="DE" data-anchor="tariff">看德国市场的电价机制</button></div>')+'</section>';
+    }
+
+    h+='<section class="sec" id="method">'+card(cardHead('口径说明','<span class="tiny dim">每个数字都能追</span>')+
+      '<p style="font-size:13px;color:var(--ink-2)">'+
+      '所有金额是欧元，负号前置。收益按"零售电价 + 输配电费"的合计单价计算，上网按 €0.078/度 结算。'+
+      '往返效率取 0.90，也就是存进去 10 度、放出来 9 度。电池折旧按 €0.105/度 计入，来源是 6000 次质保循环与设备价格。'+
+      '毛利与净利分开算，你看到的都是净利。</p>'+
+      '<details class="deep"><summary>展开深水区口径（专业数值与来源）</summary><div class="deep-body">'+
+      kv('往返效率','0.90（厂商标称 0.92，按实测下调）')+
+      kv('折旧单价','€0.105 / kWh（6000 EFC 质保上限折算）')+
+      kv('网费与税费','€0.030 / kWh（分时段的输配电费）')+
+      kv('套利门槛','€0.150 / kWh 价差（你 2026-04-02 确认）')+
+      kv('单日净收益区间','夏季 €3.00–8.00；冬季 €0.50–2.50')+
+      '<p class="card-note">这些数只在你想看的时候出现。日常我说"为几毛钱不值得伤电池"。</p>'+
+      '</div></details>')+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ⑫ 协作 ---------- */
+PAGES.collaborate={
+  title:'协作',
+  empty:{title:'没有等你确认的事',desc:'我能在你划的线里自己决定，这是好事。',action:'today',actionLabel:'回到今日'},
+  denied:{title:'这个确认要业主本人点',desc:'我可以把提议推给业主，他点一下就好。',action:'推送给业主'},
+  render(){
+    const matrix=[
+      {l:'L1', name:'我自己决定', who:'我', examples:['日常充电放电安排','上网与自用的取舍','计划内的临时修正'],
+       tone:'ghost', flow:'事后告诉你，你随时能推翻'},
+      {l:'L2', name:'我准备好了，等你点头', who:'你（一次点击）', examples:['数据源失效要不要手动填','临时放开循环预算','修改计划里的一次动作'],
+       tone:'warn', flow:'推给你 → 你点一下 → 我执行 → 留痕'},
+      {l:'L3', name:'只能你自己来', who:'你（带审批与留痕）', examples:['改动备电底线与循环预算','改动套利门槛与静默时段','涉及电线和电池寿命的改动'],
+       tone:'danger', flow:'你提交 → 我算影响 → 你确认 → 写入留痕并通知安装商'}
+    ];
+    let h=pageHead('协作','有 '+SIM.pending.length+' 件事等你确认，最近一次你改规则是在昨天');
+
+    h+='<section class="sec" id="matrix">'+card(cardHead('谁说了算：三级权限','<span class="tiny dim">人定边界，我在边界内自主</span>')+
+      '<div class="grid">'+matrix.map(m=>'<div class="c3">'+
+        '<div style="display:flex;align-items:center;gap:8px">'+badge(m.l,m.tone)+'<b style="font-size:14px">'+esc(m.name)+'</b></div>'+
+        '<div class="kv" style="margin-top:10px"><span class="k">谁能做</span><span class="v">'+esc(m.who)+'</span></div>'+
+        '<div style="font-size:13px;color:var(--ink-2);margin-top:8px">'+
+        '<ul style="margin:0;padding-left:16px">'+m.examples.map(e=>'<li>'+esc(e)+'</li>').join('')+'</ul></div>'+
+        '<p class="card-note">'+esc(m.flow)+'</p>'+
+        '</div>').join('')+'</div>')+'</section>';
+
+    h+='<section class="sec" id="pending">'+card(cardHead('待你确认','<span class="tiny dim">'+SIM.pending.length+' 件</span>')+
+      (SIM.pending.length?SIM.pending.map(p=>'<div class="row"><div class="t">'+levelBadge(p.level)+'</div>'+
+        '<div class="b"><div class="h"><span>'+esc(p.title)+'</span>'+badge('截止 '+p.deadline.slice(5),'warn')+'</div>'+
+        '<p class="p">'+esc(p.ask)+'</p>'+
+        '<p class="p tiny dim">'+esc(p.detail)+'</p></div>'+
+        '<div class="e"><button class="btn sm primary" data-act="resolve-pending" data-id="'+p.id+'">去确认</button></div></div>').join('')
+        :'<p class="tiny dim">没有等你确认的事。我能在你划的线里自己决定，这是好事。</p>')
+      )+'</section>';
+
+    h+='<section class="sec" id="l3">'+card(cardHead('只有你能做的改动','<span class="tiny dim">涉及电线和电池寿命</span>')+
+      table([{t:'申请'},{t:'谁提的'},{t:'影响'},{t:'状态'}],
+        SIM.approvals.map(a=>({cells:[esc(a.title),esc(a.from)+'<div class="tiny dim">'+esc(a.at)+'</div>',
+          esc(a.impact),a.status==='pending'?badge('等你确认','warn',true):badge('已生效','ok')]})))+
+      '<div class="btn-row" style="margin-top:12px"><button class="btn primary" data-act="approve-guardrail">同意，提到 5 小时</button>'+
+      '<button class="btn" data-goto="battery" data-anchor="guardrails-user">我要改别的红线</button></div>')+'</section>';
+
+    h+='<section class="sec" id="audit">'+card(cardHead('操作留痕','<span class="tiny dim">谁、何时、改了什么、为什么</span>')+
+      table([{t:'什么时候'},{t:'谁'},{t:'做了什么'},{t:'为什么'}],
+        SIM.audit.map(a=>({cells:['<span class="mono tiny">'+esc(a.at)+'</span>',esc(a.who),esc(a.what),
+          '<span class="tiny dim">'+esc(a.why)+'</span>']}))))+'</section>';
+
+    h+='<section class="sec" id="cadence">'+card(cardHead('我们多久碰一次面')+
+      '<div class="grid">'+
+      '<div class="c3">'+kv('每天','<span class="tiny">傍晚给你明天的计划，早上给你昨天的对照</span>')+'</div>'+
+      '<div class="c3">'+kv('每周','<span class="tiny">一封周报，只有异常才打扰你</span>')+'</div>'+
+      '<div class="c3">'+kv('每月','<span class="tiny">收益结算与循环账本</span>')+'</div>'+
+      '<div class="c3">'+kv('每季','<span class="tiny">五个问题，重新对齐你的偏好</span>')+'</div>'+
+      '</div>')+'</section>';
+
+    const rv=SIM.review;
+    h+='<section class="sec" id="review">'+card(cardHead('季度复核')+
+      kv('本期',esc(rv.period)+' · '+badge(rv.status==='due'?'到期了':'已完成',rv.status==='due'?'warn':'ok',rv.status==='due'))+
+      kv('什么时候到期',esc(rv.due))+
+      kv('上一次的偏好','省钱 '+rv.previous.savings+' / 备电 '+rv.previous.backup+' / 护电池 '+rv.previous.battery)+
+      kv('历史记录',esc(rv.history.join('、')))+
+      '<p class="card-note">五个问题，一分钟。答完我会先把"与上一版的差异"给你看，你确认了才生效。</p>'+
+      '<div class="btn-row" style="margin-top:12px"><button class="btn primary" data-goto="collaborate-review">开始季度复核</button></div>')+'</section>';
+    return h;
+  }
+};
+
+/* ---------- 季度复核向导 ---------- */
+PAGES['collaborate-review']={
+  title:'季度复核',
+  render(){
+    const qs=SIM.review.questions;
+    const step=S.reviewStep;
+    let h=pageHead('季度复核','本季你主要想改的是备电时长，我会这样跟着变',
+      '<button class="btn" data-act="review-exit">中途退出（保留已答内容）</button>');
+    h+='<section class="sec">'+card(
+      '<div class="card-head"><h2>第 '+(step+1)+' / '+qs.length+' 问</h2>'+
+      '<div class="meta">已答 '+Object.keys(S.reviewAnswers).length+' 题</div></div>'+
+      '<div class="bar lg" style="margin-bottom:18px"><i class="acc" style="width:'+pct((step)/qs.length*100,0)+'"></i></div>'+
+      '<h3 style="font-size:16px;margin-bottom:12px">'+esc(qs[step].q)+'</h3>'+
+      qs[step].a.map((opt,i)=>'<label class="radio'+(S.reviewAnswers[step]===i?' on':'')+'">'+
+        '<input type="radio" name="rq" data-act="review-answer" data-step="'+step+'" data-idx="'+i+'"'+
+        (S.reviewAnswers[step]===i?' checked':'')+'><span><span class="rt">'+esc(opt)+'</span></span></label>').join('')+
+      '<div class="btn-row" style="margin-top:16px">'+
+      '<button class="btn" data-act="review-prev"'+(step===0?' disabled':'')+'>上一题</button>'+
+      (step<qs.length-1
+        ? '<button class="btn primary" data-act="review-next">下一题</button>'
+        : '<button class="btn primary" data-act="review-submit">确认新版偏好</button>')+
+      '</div>'+
+      (S.reviewDiff? '<div style="margin-top:20px">'+cardHead('与上一版的差异')+
+        table([{t:'项'},{t:'上一版'},{t:'这一版'},{t:'我怎么跟着变'}],
+          S.reviewDiff.map(d=>({cells:[esc(d.k),esc(d.from),esc(d.to),'<span class="tiny dim">'+esc(d.effect)+'</span>']})))+'</div>':'')
+      )+'</section>';
+    return h;
+  }
+};
+
+/* ---------- ⑬ 安装商视图 ---------- */
+PAGES.installer={
+  title:'安装商视图',
+  empty:{title:'你名下还没有客户',desc:'客户在沃太后台绑定到你名下后，这里会自动出现。',action:'settings',actionLabel:'查看绑定说明'},
+  denied:{title:'这是安装商的工作台',desc:'如果你想让安装商远程看你的情况，需要先在设置里授权。',action:'去授权'},
+  render(){
+    const ins=SIM.installer;
+    let h=pageHead('安装商视图','你名下有 '+ins.customers+' 位客户，其中 '+ins.needContact+' 位需要联系',
+      '<button class="btn" data-goto="installer-tickets">工单与跟进</button>'+
+      '<button class="btn" data-act="export-customers">导出客户清单</button>');
+
+    h+='<section class="sec" id="customers">'+card(cardHead('客户列表','<span class="tiny dim">只读，不能代改红线</span>')+
+      table([{t:'客户'},{t:'当前模式'},{t:'近 7 日异常',r:true},{t:'近 30 日净省',r:true},{t:'备注'}],
+        ins.customers.map(c=>({__click:'open-customer',__id:c.name,cells:[
+          '<b>'+esc(c.name)+'</b><div class="tiny dim">'+esc(c.city)+' · '+esc(c.id)+'</div>',
+          badge(c.modeLabel,c.mode==='safe'?'danger':c.mode==='conservative'?'warn':c.mode==='auto'?'acc':'ghost'),
+          '<span class="num">'+c.incidents7+'</span>',
+          '<span class="num '+(c.net30<0?'neg':'pos')+'">'+eur(c.net30,{sign:true})+'</span>',
+          '<span class="tiny dim">'+esc(c.note)+'</span>']}))))+'</section>';
+
+    if(S.param){
+      const name=S.param;
+      const c=ins.customers.find(x=>x.name===name);
+      const d=ins.customerDetail[name]||ins.customerDetail['张伟'];
+      h+='<section class="sec" id="strategy">'+card(cardHead('客户详情 · '+name,
+        '<div class="meta">'+(c?modeBadge(c.mode):'')+'<button data-act="back-customer">返回列表</button></div>'))+
+        '<div class="grid"><div class="c6">'+
+        kv('偏好配比',esc(d.strategy))+
+        kv('红线',esc(d.guardrails.join('；')))+
+        kv('家庭画像',esc(d.profile))+
+        '</div><div class="c6">'+
+        kv('近 7 日异常',String(d.incidents)+' 起')+
+        kv('近 30 天决策',String(d.decisions)+' 条')+
+        kv('近 30 日净省','<span class="num '+(d.earnings<0?'neg':'pos')+'">'+eur(d.earnings,{sign:true})+'</span>')+
+        '</div></div></section>';
+      h+='<section class="sec" id="tools">'+card(cardHead('远程支持工具')+
+        d.tools.map(t=>'<div class="kv"><span class="k">'+esc(t)+'</span><span class="v">'+
+          '<button class="btn sm" data-act="installer-tool" data-id="'+esc(t)+'">使用</button></span></div>').join('')+
+        '<p class="card-note">涉及备电与电池寿命的改动只能由业主本人确认。我可以发起申请，让业主一键同意。</p>'+
+        '<div class="btn-row" style="margin-top:12px">'+
+        '<button class="btn danger" data-act="factory-reset">一键回退出厂策略</button>'+
+        '<button class="btn" data-act="ask-owner">申请修改红线</button></div>')+'</section>';
+    }else{
+      h+='<p class="card-note">点任意一行进入客户详情：策略、红线、决策日志、异常与远程工具。</p>';
+    }
+    return h;
+  }
+};
+PAGES['installer-tickets']={
+  title:'工单',
+  empty:{title:'没有在办的工单',desc:'客户来电和系统告警都会自动生成工单。',action:'installer',actionLabel:'回到客户列表'},
+  render(){
+    let h=pageHead('工单','有 4 张工单在处理，最早一张已开 6 天');
+    h+='<section class="sec" id="list">'+card(cardHead('工单与跟进')+
+      table([{t:'工单号'},{t:'来源'},{t:'主题'},{t:'负责人'},{t:'已开',r:true},{t:'状态'}],
+        SIM.installer.tickets.map(t=>({cells:[
+          '<span class="mono tiny">'+esc(t.id)+'</span>',esc(t.from),esc(t.subject),esc(t.owner),
+          '<span class="num">'+t.days+' 天</span>',
+          t.status==='待分配'?badge('待分配','warn'):badge('处理中','acc')]}))))+
+      '<p class="card-note">工单来源有两类：客户来电与系统告警。系统告警会自动带上事故简报，接手的人不用从零排查。</p>'+
+      '</section>';
+    return h;
+  }
+};
+
+/* ---------- ⑭ 设置 ---------- */
+PAGES.settings={
+  title:'设置',
+  empty:{title:'设置还没加载出来',desc:'这些设置存在设备本地，稍后再试一次。',action:'today',actionLabel:'回到今日'},
+  denied:{title:'这件事只有业主本人能改',desc:'涉及停电备用和电池寿命，安装商不能代改。你可以发起一个申请，让业主一键确认。',action:'发起变更申请'},
+  render(){
+    const st=SIM.settings, p=st.prefs;
+    let h=pageHead('设置','当前是'+MODES[S.mode].name+'，通知走 App 推送');
+
+    h+='<section class="sec" id="preferences">'+card(cardHead('偏好配比','<span class="tiny dim">三者相加必须是 100</span>')+
+      ['savings','backup','battery'].map(k=>{ const label={savings:'省钱',backup:'备电',battery:'护电池'}[k];
+        const tone=k==='backup'?'acc':k==='battery'?'warn':'';
+        return '<div class="slider"><span class="k">'+label+'</span>'+
+        '<input type="range" min="0" max="100" step="5" value="'+p[k]+'" data-pref="'+k+'" aria-label="'+label+'权重">'+
+        '<span class="v num">'+p[k]+'</span></div>'; }).join('')+
+      '<div class="bar lg" style="margin-top:14px"><i class="acc" style="width:'+p.backup+'%"></i></div>'+
+      '<p class="card-note">省钱 '+p.savings+' / 备电 '+p.backup+' / 护电池 '+p.battery+
+      '。备电给得越多，我越少动你的电池；护电池给得越多，我越少跑循环。</p>')+'</section>';
+
+    h+='<section class="sec" id="notifications">'+card(cardHead('通知')+
+      st.channels.map(c=>'<div class="kv"><span class="k">'+esc(c.k)+(c.note?'<span class="tiny dim"> · '+esc(c.note)+'</span>':'')+'</span>'+
+        '<span class="v"><button class="chk" aria-pressed="'+(!!c.on)+'" data-act="toggle-channel" data-id="'+esc(c.k)+'">'+
+        (c.on?'开着':'关着')+'</button></span></div>').join('')+
+      kv('静默时段',esc(st.quiet))+
+      kv('每天最多打扰几次',st.dailyMax+' 次')+
+      '<div class="card-head" style="margin-top:16px"><h2>最近的通知记录</h2></div>'+
+      table([{t:'什么时候'},{t:'通道'},{t:'级别'},{t:'内容'},{t:'结果'}],
+        st.notifications.map(n=>({cells:['<span class="mono tiny">'+esc(n.at)+'</span>',esc(n.channel),levelBadge(n.level),
+          esc(n.what),n.suppressed?badge('被我压下来了','warn'):badge('已发出','ok')]})))+
+      '<p class="card-note">'+esc(st.notifications[0].reason)+'</p>'+
+      '<p class="card-note">L3 事件不受静默时段限制，一定会响。</p>')+'</section>';
+
+    h+='<section class="sec" id="automation">'+card(cardHead('自动化')+
+      '<div class="kv"><span class="k">当前模式</span><span class="v">'+modeBadge(S.mode)+'</span></div>'+
+      kv('什么时候变成这样的','2026-06-17 06:10')+
+      kv('回退出厂策略','<button class="btn sm danger" data-act="factory-reset">回退出厂策略</button>')+
+      '<p class="card-note">回退只影响以后：历史数据、决策日志与收益记录全部保留。你随时可以重新开启管家调度。</p>'+
+      '<div class="seg" style="margin-top:12px">'+MODE_ORDER.map(m=>'<button data-mode="'+m+'" class="'+(S.mode===m?'on':'')+'">'+MODES[m].name+'</button>').join('')+'</div>'+
+      '<p class="card-note tiny">上面这排只在原型里出现，用来逐页检查六种模式的呈现。</p>')+'</section>';
+
+    h+='<section class="sec" id="privacy">'+card(cardHead('数据与隐私')+
+      kv('谁授权看过我','安装商 Solarwerk Süd GmbH · 2025-02-18 授权，可撤销')+
+      kv('我能导出什么','全部决策日志、收益明细、留痕记录（CSV）')+
+      kv('删除','删除后设备回到出厂默认，历史数据不可恢复')+
+      '<div class="btn-row" style="margin-top:12px"><button class="btn" data-act="export-all">导出我的全部数据</button>'+
+      '<button class="btn danger" data-act="delete-all">删除全部数据</button></div>'+
+      '<p class="card-note">单户用能曲线属于个人敏感数据，沃太运营只能看到汇总，看不到你家的曲线。</p>')+'</section>';
+
+    h+='<section class="sec" id="about">'+card(cardHead('关于与口径')+
+      kv('应用版本','沃太家庭能源管家 Butler v2.0（原型）')+
+      kv('家庭编号','<span class="mono">'+esc(SIM.household.id)+'</span>')+
+      kv('设备固件','<span class="mono">'+esc(SIM.site.fw)+'</span>')+
+      kv('开通时间',esc(SIM.household.joinedAt)+'（已 '+SIM.household.sinceDays+' 天）')+
+      '<div id="glossary" style="margin-top:16px">'+cardHead('口径说明')+
+      '<p style="font-size:13px;color:var(--ink-2)">'+
+      '金额一律为欧元，负号前置。预测一律给区间，不给单点。'+
+      '"度"指一度电；"循环"指电池从满到空再用满一次。'+
+      '收益按"零售电价 + 输配电费"的合计价算，上网按 €0.078/度 结算。'+
+      '往返效率 0.90，电池折旧 €0.105/度。</p>'+
+      '<p class="card-note">原型期的全部数字为模拟数据，不得用于对外报价或收益承诺。</p></div>')+
+      '</section>';
+    return h;
+  }
+};
+
+/* ---------- ⑨ 引导 ---------- */
+PAGES.onboarding={
+  title:'引导',
+  render(){
+    const o=SIM.onboarding, sh=o.shadow;
+    const step=S.onboardStep;
+    let h='<div class="page-head"><div class="row"><div>'+
+      '<h1 id="page-h1" tabindex="-1">'+
+      (step===0?'三问定调':step===1?'影子期':'影子期小结')+'</h1>'+
+      '<p class="sub">'+(step===0?'三个问题，一分钟，之后你可以随时改'
+        :step===1?'还有 0 天结束，这段时间我只看不做'
+        :'这 14 天如果按我说的做，你大约省了 '+eur(sh.ifFollowed))+'</p></div>'+
+      '<div class="actions"><span class="seg">'+
+      ['三问定调','影子期看板','影子期小结'].map((t,i)=>'<button data-onbstep="'+i+'" class="'+(step===i?'on':'')+'">'+t+'</button>').join('')+
+      '</span></div></div></div>';
+
+    if(step===0){
+      h+='<section class="sec">'+card(
+        o.questions.map((q,i)=>'<div style="margin-bottom:18px">'+
+          '<h3 style="font-size:15px;margin-bottom:10px">'+(i+1)+'. '+esc(q.q)+'</h3>'+
+          q.opts.map((opt,j)=>'<label class="radio'+(S.onboardAnswers[i]===j?' on':'')+'">'+
+            '<input type="radio" name="oq'+i+'" data-act="onb-answer" data-step="'+i+'" data-idx="'+j+'"'+
+            (S.onboardAnswers[i]===j?' checked':'')+'><span><span class="rt">'+esc(opt)+'</span></span></label>').join('')+
+          '</div>').join('')+
+        '<div class="btn-row"><button class="btn primary" data-act="onb-submit">就这些，开始吧</button>'+
+        '<button class="btn" data-act="onb-default">全部用默认值跳过</button></div>'+
+        '<p class="card-note">你用不到任何百分比。备电时长、循环预算这些我会自动换算，改的时候用小时和次数。</p>')+'</section>';
+    }
+    if(step===1){
+      const done=sh.days.filter(d=>d.followed).length;
+      h+='<section class="sec">'+card(cardHead('影子期进度',
+        '<span class="tiny dim">'+sh.startedAt+' 至 '+sh.endsAt+' · 共 '+sh.daysTotal+' 天</span>')+
+        '<div class="bar lg"><i class="acc" style="width:'+pct(sh.daysDone/sh.daysTotal*100,0)+'"></i></div>'+
+        '<div class="grid" style="margin-top:16px">'+
+        '<div class="c4">'+kv('已过天数',sh.daysDone+' / '+sh.daysTotal)+'</div>'+
+        '<div class="c4">'+kv('你照做了',done+' 天')+'</div>'+
+        '<div class="c4">'+kv('如果全照做能省',eur(sh.ifFollowed))+'</div>'+
+        '</div>'+
+        '<p class="card-note">这段时间我只出建议，不执行任何动作。你一次都不用管我。</p>')+'</section>';
+      h+='<section class="sec" id="compare">'+card(cardHead('建议 vs 实际')+
+        table([{t:'日期'},{t:'我建议的'},{t:'实际发生的'},{t:'差多少',r:true}],
+          sh.days.map(d=>({cells:['<span class="mono tiny">'+esc(d.d)+'</span>',esc(d.advice),
+            d.followed?badge('照做了','ok'):badge('没执行','ghost'),
+            '<span class="num '+(d.eur>0?'pos':'dim')+'">'+(d.eur?eur(d.eur,{sign:true}):'—')+'</span>']}))))+'</section>';
+    }
+    if(step===2){
+      h+='<section class="sec" id="enable">'+card(cardHead('影子期的结论')+
+        '<div class="grid">'+
+        '<div class="c4"><span class="k tiny dim">如果全照我说的做</span><div class="num" style="font-size:26px">'+eur(sh.ifFollowed)+'</div></div>'+
+        '<div class="c4"><span class="k tiny dim">比出厂策略多</span><div class="num" style="font-size:26px">'+eur(sh.delta)+'</div></div>'+
+        '<div class="c4"><span class="k tiny dim">你有 4 天没执行</span><div class="num" style="font-size:26px">4<small>天</small></div></div>'+
+        '</div>'+
+        '<p class="card-note">这 14 天如果按我说的做，你大约省了 '+eur(sh.ifFollowed)+
+        '。这 4 天没执行的原因我记下了：两次半夜不想被吵，两次白天家里没人。</p>'+
+        '<div class="btn-row" style="margin-top:16px">'+
+        '<button class="btn primary" data-act="enable-auto">现在就开始自动</button>'+
+        '<button class="btn" data-act="defer-auto">再观察一段时间</button></div>'+
+        '<p class="card-note tiny">开始自动后，涉及你家红线的动作我仍然会先问你。</p>')+'</section>';
+    }
+    return h;
+  }
+};
+
+/* ============================================================================
+   8 · 抽屉 / 全屏确认页 / 提示
+   ============================================================================ */
+let lastFocus=null;
+function openDrawer(title,body,foot){
+  lastFocus=document.activeElement;
+  const d=document.getElementById('drawer');
+  d.innerHTML='<div class="dhead"><h3>'+esc(title)+'</h3>'+
+    '<button class="icon-btn" style="margin-left:auto" data-act="close-drawer" aria-label="关闭">'+
+    '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 5l10 10M15 5L5 15"/></svg></button></div>'+
+    '<div class="dbody">'+body+'</div>'+(foot?'<div class="dfoot">'+foot+'</div>':'');
+  d.hidden=false; d.classList.add('open');
+  document.getElementById('scrim').classList.add('open');
+  const f=d.querySelector('button,input,[href]'); if(f) f.focus();
+}
+function closeDrawer(){
+  const d=document.getElementById('drawer');
+  d.classList.remove('open'); d.hidden=true;
+  document.getElementById('scrim').classList.remove('open');
+  if(lastFocus&&lastFocus.focus){ try{lastFocus.focus();}catch(e){} }
+  lastFocus=null;
+}
+function openFullpage(html){
+  const f=document.getElementById('fullpage');
+  f.innerHTML='<div class="fp-inner">'+html+'</div>';
+  f.hidden=false; f.classList.add('open');
+  document.body.style.overflow='hidden';
+  const el=f.querySelector('input,button'); if(el) el.focus();
+}
+function closeFullpage(){
+  const f=document.getElementById('fullpage');
+  f.classList.remove('open'); f.hidden=true;
+  document.body.style.overflow='';
+}
+let toastTimer=null;
+function toast(msg,actionLabel,action){
+  const t=document.getElementById('toast');
+  t.innerHTML=esc(msg)+(actionLabel?'<button data-toast-act="1">'+esc(actionLabel)+'</button>':'');
+  t.classList.add('open');
+  if(action) t._act=action; else t._act=null;
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('open'),5000);
+}
+
+/* ---------- 全屏确认页：回退出厂策略 ---------- */
+function factoryResetPage(){
+  return '<span class="badge warn">高影响操作 · 不是弹窗，请读完再决定</span>'+
+    '<h2 style="margin-top:16px">回退出厂策略</h2>'+
+    '<p class="lead">管家将停止一切优化，电池回到出厂的自发自用优先策略。</p>'+
+    '<div class="fp-sec"><h4>会发生什么</h4><p>管家将停止一切优化，电池回到出厂的自发自用优先策略。今天已经排好的动作全部取消。</p></div>'+
+    '<div class="fp-sec"><h4>不会发生什么</h4><p>历史数据、决策日志与收益记录全部保留；你也可以随时重新开启管家调度。</p></div>'+
+    '<div class="fp-sec"><h4>如何恢复</h4><p>在"设置 - 自动化"里重新开启，或点这里现在恢复。</p></div>'+
+    '<div class="fp-sec"><h4>确认</h4>'+
+    '<div class="field"><label for="fr-input">请输入"出厂策略"四个字</label>'+
+    '<input type="text" id="fr-input" placeholder="出厂策略" autocomplete="off">'+
+    '<span class="help">输入完全一致后，下面的按钮才会亮。不用长按，键盘也能操作。</span></div>'+
+    '<div class="fp-actions"><button class="btn danger" id="fr-ok" disabled data-act="factory-ok">确认回退</button>'+
+    '<button class="btn" data-act="factory-cancel">取消，返回</button></div></div>';
+}
+function fusePage(m){
+  return '<span class="badge danger">影响超过 50 户 · 需要二次确认</span>'+
+    '<h2 style="margin-top:16px">熔断 '+esc(m.name)+' 市场</h2>'+
+    '<p class="lead">熔断后，这个市场的 '+m.users+' 户家庭会切到保守模式，并收到一条说明。</p>'+
+    '<div class="fp-sec"><h4>会发生什么</h4><p>'+m.users+' 户家庭停止一切套利，只保证自发自用与停电备用。</p></div>'+
+    '<div class="fp-sec"><h4>不会发生什么</h4><p>历史数据与收益记录保留；解除熔断后自动恢复原来的模式。</p></div>'+
+    '<div class="fp-sec"><h4>确认</h4><div class="btn-row">'+
+    '<button class="btn danger" data-act="fuse-ok" data-id="'+esc(m.id)+'">确认熔断</button>'+
+    '<button class="btn" data-act="factory-cancel">取消</button></div></div>';
+}
+function deletePage(){
+  return '<span class="badge danger">不可恢复</span>'+
+    '<h2 style="margin-top:16px">删除全部数据</h2>'+
+    '<p class="lead">删除后设备回到出厂默认，历史数据不可恢复。</p>'+
+    '<div class="fp-sec"><h4>会发生什么</h4><p>决策日志、收益记录、留痕、画像全部删除。</p></div>'+
+    '<div class="fp-sec"><h4>不会发生什么</h4><p>设备本身不会断电，停电时仍然会自动供给备用电源。</p></div>'+
+    '<div class="fp-sec"><div class="btn-row"><button class="btn danger" data-act="delete-ok">确认删除</button>'+
+    '<button class="btn" data-act="factory-cancel">取消</button></div></div>';
+}
+function shortcutsPage(){
+  const rows=[['g t','今日'],['g p','计划'],['g d','决策'],['g i','异常'],['g h','家庭'],['g b','电池'],
+    ['g r','收益'],['g c','协作'],['g s','设置'],['/','聚焦当前页的筛选或搜索框'],['?','打开这个帮助'],['Esc','关闭最上层浮层']];
+  return '<span class="badge">键盘</span><h2 style="margin-top:16px">快捷键</h2>'+
+    '<p class="lead">统一 g 前缀，避免和输入框里的字母冲突。输入框获得焦点时全部失效，只保留 Esc。</p>'+
+    '<div class="fp-sec">'+table([{t:'按键'},{t:'作用'}],rows.map(r=>({cells:['<span class="mono">'+esc(r[0])+'</span>',esc(r[1])]})))+'</div>'+
+    '<div class="fp-actions"><button class="btn" data-act="factory-cancel">关闭</button></div>';
+}
+
+/* ---------- 各类抽屉 ---------- */
+function pendingDrawer(id){
+  const p=SIM.pending.find(x=>x.id===id); if(!p) return;
+  openDrawer(p.title,
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">'+levelBadge(p.level)+badge('来自 '+p.origin,'ghost')+
+    badge('截止 '+p.deadline,'warn')+'</div>'+
+    '<p style="font-size:15px;margin-top:14px">'+esc(p.ask)+'</p>'+
+    '<p style="font-size:13px;color:var(--ink-2);margin-top:10px">'+esc(p.detail)+'</p>'+
+    '<div class="card-head" style="margin-top:18px"><h2>你的选择</h2></div>'+
+    p.options.map((o,i)=>'<label class="radio"><input type="radio" name="po" data-act="noop"><span><span class="rt">'+esc(o)+'</span></span></label>').join('')+
+    '<p class="card-note">无论你选哪个，我都会把这次确认写进留痕。</p>',
+    '<button class="btn primary" data-act="pending-ok" data-id="'+esc(id)+'">确认</button>'+
+    '<button class="btn" data-act="close-drawer">稍后再说</button>');
+}
+function disagreeDrawer(id){
+  openDrawer('这个决定我不同意',
+    '<p style="font-size:13px;color:var(--ink-2)">先告诉我是哪一种。这决定我改一次，还是改规则。</p>'+
+    '<label class="radio" style="margin-top:14px"><input type="radio" name="dg" checked data-act="noop">'+
+    '<span><span class="rt">就这一次，别这么做</span><span class="rd">我只取消这一条，规则不动。</span></span></label>'+
+    '<label class="radio"><input type="radio" name="dg" data-act="noop">'+
+    '<span><span class="rt">以后都按我说的来</span><span class="rd">这会改动你的红线，需要你本人确认，我会生成一条待审批申请。</span></span></label>'+
+    '<p class="card-note">涉及备电与电池寿命的改动只能由你本人批准，安装商不能代改。</p>',
+    '<button class="btn primary" data-act="disagree-ok" data-id="'+esc(id)+'">确认</button>'+
+    '<button class="btn" data-act="close-drawer">取消</button>');
+}
+function slotDrawer(from){
+  const s=SIM.planSlots.find(x=>x.from===from)||SIM.planSlots[0];
+  openDrawer('明天 '+s.from+'–'+s.to+' · '+s.label,
+    '<p style="font-size:15px">'+esc(s.detail)+'</p>'+
+    '<p style="font-size:13px;color:var(--ink-2);margin-top:10px">'+esc(s.source)+'</p>'+
+    '<div style="margin-top:16px">'+kv('预计收益',eur(s.expectedEur))+kv('循环消耗',s.efc?s.efc.toFixed(2)+' 次':'不消耗')+
+    kv('这一段合计电价',S.gridFeeView?'€'+(SIM.priceTomorrow[+s.from.slice(0,2)]+SIM.feeByHour[+s.from.slice(0,2)]).toFixed(2)+' / 度':
+      '展开电网费视角后可见')+'</div>'+
+    '<details class="deep"><summary>展开完整依据</summary><div class="deep-body">'+
+    kv('零售电价','€'+SIM.priceTomorrow[+s.from.slice(0,2)].toFixed(2)+' / 度')+
+    kv('输配电费','€'+SIM.feeByHour[+s.from.slice(0,2)].toFixed(2)+' / 度')+
+    kv('预报置信度',SIM.planConfidence.value.toFixed(2))+
+    kv('我从哪学的','这户过去 30 天在同一时段的平均负荷')+'</div></details>',
+    '<button class="btn primary" data-act="plan-keep">保留这个动作</button>'+
+    '<button class="btn" data-act="plan-drop">去掉这个动作</button>');
+}
+function guardrailDrawer(id){
+  const g=SIM.guardrails.find(x=>x.id===id)||SIM.guardrails[0];
+  openDrawer('修改 · '+g.name,
+    '<div class="field"><label for="gr-v">改成什么</label>'+
+    '<input type="text" id="gr-v" value="'+esc(g.cur)+'"><span class="help">'+esc(g.help)+'</span></div>'+
+    '<div class="card-head"><h2>这会改变什么</h2></div>'+
+    '<div style="font-size:13px;color:var(--ink-2)">'+
+    '<p>提高备电时长：停电时多撑一会儿，但可用的电变少，每月大约少赚 €4。</p>'+
+    '<p style="margin-top:8px">提高循环预算：能多做几次套利，但电池寿命会缩短。</p>'+
+    '<p style="margin-top:8px">提高价差门槛：我动手的次数变少，但每一次都更划算。</p></div>'+
+    '<p class="card-note">提交后我会生成一条 L3 申请，需要你本人确认才生效，并写进留痕。</p>',
+    '<button class="btn primary" data-act="submit-guardrail" data-id="'+esc(g.id)+'">提交，生成申请</button>'+
+    '<button class="btn" data-act="close-drawer">取消</button>');
+}
+
+/* ============================================================================
+   9 · 事件处理
+   ============================================================================ */
+const ACTS={
+  'close-drawer':closeDrawer,
+  'noop':function(){},
+  'factory-cancel':function(){ closeFullpage(); },
+  'factory-ok':function(){
+    S.mode='conservative'; closeFullpage(); go('today');
+    toast('已回退出厂策略。模式变为"我已暂停套利"，历史数据与收益记录完整保留，并写入一条 L2 留痕。');
+  },
+  'fuse-ok':function(el){
+    const m=SIM.markets.find(x=>x.id===el.getAttribute('data-id')); if(m) m.fuse=true;
+    closeFullpage(); render(); toast('已熔断，'+m.users+' 户家庭收到说明并切到保守模式。');
+  },
+  'unfuse-market':function(){ var m=curMarket(); if(m)m.fuse=false; render(); toast('已解除熔断，用户会自动回到原来的模式。'); },
+  'fuse-market':function(el){
+    const m=SIM.markets.find(x=>x.id===el.getAttribute('data-id'))||curMarket();
+    openFullpage(fusePage(m));
+  },
+  'delete-ok':function(){ closeFullpage(); toast('原型里不会真的删除数据。'); },
+  'shortcuts':function(){ openFullpage(shortcutsPage()); },
+  'reload-data':function(){ S=JSON.parse(JSON.stringify(DEFAULT_STATE)); go('today'); toast('模拟数据已重置为初始状态。'); },
+  'stamp':function(){ toast('时间戳可以点开：这里会列出数据来源与更新记录。这是最近一次有效值，不是当前值。'); },
+  'mode-why':function(){ go('collaborate',null,'matrix'); },
+  'resolve-pending':function(el){ pendingDrawer(el.getAttribute('data-id')); },
+  'pending-ok':function(el){
+    const id=el.getAttribute('data-id');
+    SIM.pending=SIM.pending.filter(x=>x.id!==id);
+    closeDrawer(); render();
+    toast('已确认。这次选择已写进留痕，模式会在数据恢复后自动回到自动。');
+  },
+  'plan-accept':function(){ render(); toast('收到，明天就按这张表走。'); },
+  'plan-adjust':function(){ toast('你可以拖动时段，也可以直接写下你想要的时段，我会重算收益区间。'); },
+  'plan-old':function(){ toast('明天按老办法来：只自发自用，不做套利。'); },
+  'plan-lock':function(){ toast('已锁单，今天我不会再改这张计划。'); },
+  'plan-slot':function(el){ slotDrawer(el.getAttribute('data-id')); },
+  'plan-keep':function(){ closeDrawer(); toast('保留这个动作。'); },
+  'plan-drop':function(){ closeDrawer(); render(); toast('已去掉这个动作，并记录了原因。'); },
+  'toggle-gridfee':function(){ S.gridFeeView=!S.gridFeeView; render(); },
+  'forgone-why':function(){ toast('这属于动你红线的动作，我先准备好了材料，需要你点一下才会执行。','去确认',function(){ go('collaborate',null,'pending'); }); },
+  'disagree':function(el){ disagreeDrawer(el.getAttribute('data-id')); },
+  'disagree-ok':function(){
+    const always=document.querySelector('input[name=dg]:checked') && document.querySelectorAll('input[name=dg]')[1].checked;
+    closeDrawer();
+    if(always){ toast('已生成一条 L3 申请：以后都按你说的来。需要你本人确认后才生效。'); go('battery',null,'guardrails-user'); }
+    else toast('好，就这一次。我已经取消它，规则不动。');
+  },
+  'closure':function(el){
+    if(el.getAttribute('data-scope')==='class'){ toast('已生成规则变更任务。'); go('collaborate',null,'l3'); }
+    else toast('好，就这一次。我把这次处置记进留痕了。');
+  },
+  'resolve-incident':function(el){
+    const i=SIM.incidents.find(x=>x.id===el.getAttribute('data-id'));
+    if(i){ i.status='closed'; i.recovery='已恢复，我在观察'; }
+    render(); toast('已确认恢复。接下来 72 小时我仍然只做保守安排。');
+  },
+  'export-briefing':function(){ toast('事故简报已导出为 PDF（原型里只做提示）。'); },
+  'export-report':function(){ toast('收益明细已导出为 CSV（原型里只做提示）。'); },
+  'export-all':function(){ toast('全部数据已导出为 CSV（原型里只做提示）。'); },
+  'export-customers':function(){ toast('客户清单已导出为 CSV（原型里只做提示）。'); },
+  'method':function(){ var e=document.getElementById('method'); if(e) e.scrollIntoView({block:'start'}); toast('已定位到口径说明。'); },
+  'all-correct':function(){ SIM.profile.guesses.forEach(g=>g.editOpen=false); render(); toast('记下了。以后我按这些规律排计划。'); },
+  'correct':function(){ SIM.profile.guesses[0].editOpen=true; render(); toast('点每一条右边的"不对"，就地改，不用跳页。'); },
+  'correct-item':function(el){ SIM.profile.guesses[+el.getAttribute('data-idx')].editOpen=true; render(); },
+  'cancel-correct':function(){ SIM.profile.guesses.forEach(g=>g.editOpen=false); render(); },
+  'save-correct':function(){
+    SIM.profile.guesses.forEach(g=>g.editOpen=false); render();
+    toast('已更正。我会怎么变：这条规律的权重清零，接下来 7 天先按你写的来，再看实际用电确认。');
+  },
+  'edit-guardrail':function(el){ guardrailDrawer(el.getAttribute('data-id')); },
+  'submit-guardrail':function(el){
+    closeDrawer();
+    SIM.approvals.unshift({id:'GR-0007',title:'红线变更（待你确认）',from:'户主',at:'刚刚',
+      status:'pending',impact:'我需要先算影响，算好推给你',need:'业主本人确认'});
+    render(); toast('已生成 L3 申请：涉及备电与电池寿命，只有你本人能批。写进留痕，并通知安装商后台。');
+  },
+  'approve-guardrail':function(){
+    SIM.approvals.forEach(a=>a.status='approved');
+    render(); toast('已生效。备电底线现在是 5 小时，每月大约少赚 €4，但停电时多撑 1 小时。已写进留痕。');
+  },
+  'open-market':function(el){ go('markets',el.getAttribute('data-id'),'tariff'); },
+  'edit-market':function(){ toast('运营角色才能编辑策略包。这里是只读视图。'); },
+  'market-review':function(){ toast('已触发存量用户复核：'+SIM.markets.filter(m=>m.review).length+' 个市场的用户会在 72 小时内收到说明。'); },
+  'open-customer':function(el){ go('installer',el.getAttribute('data-id'),'strategy'); },
+  'back-customer':function(){ go('installer'); },
+  'installer-tool':function(el){ toast('已打开：'+el.getAttribute('data-id')+'（原型里只做提示）。'); },
+  'ask-owner':function(){ toast('已向业主发起申请，他点一下就能同意。','推送给业主',function(){ toast('已推送。'); }); },
+  'toggle-channel':function(el){
+    const c=SIM.settings.channels.find(x=>x.k===el.getAttribute('data-id'));
+    if(c) c.on=!c.on; render();
+  },
+  'review-answer':function(el){ S.reviewAnswers[+el.getAttribute('data-step')]=+el.getAttribute('data-idx'); render(); },
+  'review-next':function(){ S.reviewStep=Math.min(S.reviewStep+1,SIM.review.questions.length-1); render(); },
+  'review-prev':function(){ S.reviewStep=Math.max(S.reviewStep-1,0); render(); },
+  'review-exit':function(){ go('collaborate',null,'review'); toast('已保存你答到第 '+(S.reviewStep+1)+' 问的内容，随时可以接着答。'); },
+  'review-submit':function(){
+    S.reviewDiff=[
+      {k:'备电底线',from:'4 小时',to:'5 小时',effect:'每月少赚约 €4.00，停电多撑 1 小时'},
+      {k:'夜间静默',from:'23:00–07:00',to:'23:00–07:00（不变）',effect:'不变'},
+      {k:'套利价差门槛',from:'€0.15 / 度',to:'€0.18 / 度',effect:'动手次数减少约 12%，每次更划算'},
+      {k:'偏好配比',from:'省钱 40 / 备电 40 / 护电池 20',to:'省钱 35 / 备电 45 / 护电池 20',effect:'计划更保守，收益区间更窄'}
+    ];
+    render(); toast('这是新旧两版的差异，确认后才生效。','确认新版偏好',function(){
+      SIM.settings.prefs={savings:35,backup:45,battery:20};
+      SIM.review.status='done';
+      go('collaborate',null,'audit');
+      toast('新版偏好已生效并写进留痕。');
+    });
+  },
+  'onb-answer':function(el){ S.onboardAnswers[+el.getAttribute('data-step')]=+el.getAttribute('data-idx'); render(); },
+  'onb-submit':function(){ S.onboardStep=1; render(); toast('收到。换算成备电时长与循环预算我做好了，你用不到任何百分比。'); },
+  'onb-default':function(){ S.onboardAnswers={0:1,1:1,2:0}; S.onboardStep=1; render(); toast('用了默认值：备电 4 小时、两边都顾、整夜静默。'); },
+  'enable-auto':function(){ S.onboarded=true; S.mode='auto'; go('today'); toast('已开启自动模式。涉及你家红线的动作我仍然会先问你。'); },
+  'defer-auto':function(){ S.onboarded=true; S.mode='advisory'; go('today'); toast('继续观察模式：我出建议，你自己决定。'); }
+};
+function curMarket(){ return SIM.markets.find(x=>x.id===S.param)||SIM.markets[0]; }
+
+document.addEventListener('click',function(ev){
+  const t=ev.target;
+  const tt=t.closest('[data-toast-act]');
+  if(tt){ const el=document.getElementById('toast'); if(el._act) el._act(); el.classList.remove('open'); return; }
+
+  const role=t.closest('[data-role]');
+  if(role){ S.role=role.getAttribute('data-role'); S.param=null; render(); return; }
+
+  const modeBtn=t.closest('[data-mode]');
+  if(modeBtn){ S.mode=modeBtn.getAttribute('data-mode'); render();
+    toast('运行模式已切到"'+MODES[S.mode].name+'"。'); return; }
+
+  const ps=t.closest('[data-state]');
+  if(ps){ S.pageState=ps.getAttribute('data-state'); render(); return; }
+
+  const stl=t.closest('[data-stale]');
+  if(stl){ S.stale=stl.getAttribute('data-stale')==='1'; render(); return; }
+
+  const onb=t.closest('[data-onb]');
+  if(onb){ S.onboarded=onb.getAttribute('data-onb')==='1'; render(); return; }
+
+  const fl=t.closest('[data-filter]');
+  if(fl){ S.filters[fl.getAttribute('data-filter')]=fl.getAttribute('data-value'); render(); return; }
+
+  const pv=t.closest('[data-planview]');
+  if(pv){ S.planView=pv.getAttribute('data-planview'); render(); return; }
+
+  const cv=t.closest('[data-curve]');
+  if(cv){ S.houseCurve=cv.getAttribute('data-curve'); render(); return; }
+
+  const rp=t.closest('[data-report]');
+  if(rp){ S.reportPeriod=rp.getAttribute('data-report'); render(); return; }
+
+  const tr=t.closest('[data-trend]');
+  if(tr){ S.trendRange=tr.getAttribute('data-trend'); render(); return; }
+
+  const os=t.closest('[data-onbstep]');
+  if(os){ S.onboardStep=+os.getAttribute('data-onbstep'); render(); return; }
+
+  const act=t.closest('[data-act]');
+  if(act){
+    const id=act.getAttribute('data-act');
+    if(act.tagName==='INPUT'&&act.type==='radio'){ if(ACTS[id]) ACTS[id](act); }
+    else { ev.preventDefault(); if(ACTS[id]) ACTS[id](act); }
+    return;
+  }
+  const goto=t.closest('[data-goto]');
+  if(goto){ ev.preventDefault(); go(goto.getAttribute('data-goto'),goto.getAttribute('data-param'),goto.getAttribute('data-anchor')); return; }
+
+  if(t.id==='scrim') closeDrawer();
+  if(!t.closest('#overflowBtn') && !t.closest('#overflowMenu'))
+    document.getElementById('overflowMenu').classList.remove('open');
+});
+document.getElementById('overflowBtn').addEventListener('click',function(ev){
+  ev.stopPropagation();
+  const m=document.getElementById('overflowMenu');
+  m.classList.toggle('open');
+  this.setAttribute('aria-expanded',m.classList.contains('open'));
+});
+document.addEventListener('input',function(ev){
+  const fr=ev.target.id==='fr-input';
+  if(fr){ const ok=document.getElementById('fr-ok'); ok.disabled=(ev.target.value.trim()!=='出厂策略'); }
+  const rg=ev.target.closest('[data-pref]');
+  if(rg){
+    const k=rg.getAttribute('data-pref');
+    SIM.settings.prefs[k]=+rg.value;
+    const vals=SIM.settings.prefs;
+    rg.parentElement.querySelector('.v').textContent=rg.value;
+  }
+});
+document.addEventListener('change',function(ev){
+  const rg=ev.target.closest&&ev.target.closest('[data-pref]');
+  if(rg){ render(); toast('偏好已更新：省钱 '+SIM.settings.prefs.savings+' / 备电 '+SIM.settings.prefs.backup+
+    ' / 护电池 '+SIM.settings.prefs.battery+'。我会在下一份计划里体现。'); }
+});
+document.addEventListener('keydown',function(ev){
+  const tag=(ev.target.tagName||'').toLowerCase();
+  const typing = tag==='input'||tag==='textarea'||tag==='select';
+  if(ev.key==='Escape'){
+    if(document.getElementById('fullpage').classList.contains('open')) return closeFullpage();
+    if(document.getElementById('drawer').classList.contains('open')) return closeDrawer();
+    document.getElementById('overflowMenu').classList.remove('open');
+    return;
+  }
+  if(document.getElementById('fullpage').classList.contains('open')) return;
+  if(typing){ if(ev.key==='/') return; return; }
+  if(gPending){
+    const map={t:'today',p:'plan',d:'decisions',i:'incidents',h:'household',b:'battery',r:'reports',c:'collaborate',s:'settings'};
+    gPending=false;
+    if(map[ev.key]){ ev.preventDefault(); go(map[ev.key]); }
+    return;
+  }
+  if(ev.key==='g'){ gPending=true; setTimeout(()=>{gPending=false;},1500); return; }
+  if(ev.key==='?'){ ev.preventDefault(); openFullpage(shortcutsPage()); return; }
+  if(ev.key==='/'){ const f=document.querySelector('input[type=search],.filters input'); if(f){ ev.preventDefault(); f.focus(); } }
+});
+let gPending=false;
+
+/* ============================================================================
+   10 · 启动
+   ============================================================================ */
+window.addEventListener('hashchange',render);
+function init(){
+  document.title='沃太家庭能源管家 Butler · 原型';
+  if(!location.hash) location.hash='#/today';
+  render();
+}
+init();
+</script>
+</body>
+</html>

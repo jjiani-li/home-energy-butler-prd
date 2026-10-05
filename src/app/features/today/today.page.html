@@ -1,0 +1,358 @@
+<app-page-header
+  kicker="今日管家"
+  [title]="'今天，我替你算好了'"
+  [subtitle]="
+    '你不需要做任何事。下面是我今天怎么安排你的电池、省在哪、以及我主动放弃了什么。' +
+    '所有数字都是预计值，我会在每个时段结束后核对一次。'
+  "
+>
+  <div meta class="row wrap gap-4 head-meta">
+    <app-freshness
+      [label]="'设备与电价数据 · ' + store.freshTimestamp()"
+      source="电池管理单元 / 动态电价接口 / MeteoGroup"
+      [stale]="!store.flow.sourceHealthy"
+    />
+    <span class="t-sm c-muted">{{ plan().weekday }} · {{ plan().weather.summary }} · {{ plan().weather.tempC }} 度</span>
+  </div>
+  <div actions>
+    <a class="btn btn-sm" routerLink="/plan">
+      查看完整计划
+      <app-icon name="arrowRight" [size]="14" />
+    </a>
+    <a class="btn btn-sm" routerLink="/decisions">决策日志</a>
+  </div>
+</app-page-header>
+
+@if (flagged()) {
+  <div class="demo-note">
+    <app-icon name="info" [size]="14" />
+    <span class="t-sm">
+      原型状态：{{ loadLabel() }}。用一个页面演示多种数据状态，便于评审交互是否完整。
+    </span>
+    <button type="button" class="link link-accent" (click)="reload()">恢复为正常数据</button>
+  </div>
+}
+
+@if (load() === 'denied') {
+  <app-card>
+    <app-empty
+      icon="shield"
+      title="这一项属于人工专属权限，管家不能替你决定"
+      note="修改停电备用、电池寿命预算上限这类红线，属于 L3 人工专属。管家只能准备材料，不能执行。你可以发起申请，由护栏复核人确认后生效。"
+      actionLabel="去发起申请"
+      (action)="reload()"
+    />
+  </app-card>
+} @else {
+  <!-- 全局运行模式标识由应用外壳常驻显示，本页不再重复 -->
+
+  <!-- ============ 三问结论卡 ============ -->
+  <section class="grid g-3 concl" aria-label="今天的三个结论">
+    <app-card>
+      <app-stat
+        label="今天的预计净收益"
+        [value]="netEarningText()"
+        [range]="earningRangeText()"
+        [delta]="'比出厂默认策略多省 €' + baselineDelta().toFixed(2)"
+        [deltaPositive]="true"
+        icon="chart"
+      />
+      <p class="explain t-sm c-muted">
+        已经扣掉往返效率损失和电池折旧。这是净额，不是毛价差。
+      </p>
+      <button type="button" class="link link-accent" routerLink="/reports">看这笔钱怎么算出来的</button>
+    </app-card>
+
+    <app-card>
+      <app-stat
+        label="停电时够用多久"
+        [value]="backupText()"
+        [sub]="'按你家冰箱、照明和网络的用电速度折算'"
+        delta="高于你设的 8 小时底线"
+        [deltaPositive]="true"
+        tone="accent"
+        icon="shield"
+      />
+      <p class="explain t-sm c-muted">
+        这个数字是硬底线，任何赚钱的动作都不得占用它。今天没有占用过。
+      </p>
+      <button type="button" class="link link-accent" routerLink="/battery">调整停电备用时长</button>
+    </app-card>
+
+    <app-card>
+      <app-stat
+        label="今天电池累不累"
+        [value]="efcText()"
+        [sub]="efcLifeText()"
+        delta="本月额度已用 57%"
+        [deltaPositive]="true"
+        icon="battery"
+      />
+      <p class="explain t-sm c-muted">
+        每做一次套利，电池就"用掉"一点寿命。我会先查预算余额再决定做不做。
+      </p>
+      <button type="button" class="link link-accent" routerLink="/battery">看电池寿命账本</button>
+    </app-card>
+  </section>
+
+  <!-- ============ 需要你决定 ============ -->
+  @if (pendingCount() > 0) {
+    <section class="decide" aria-label="需要你决定的事">
+      <div class="decide-hd">
+        <h2 class="t-h3">需要你决定</h2>
+        <span class="tag">共 {{ pendingCount() }} 条</span>
+      </div>
+      @for (p of pending(); track p.id) {
+        <app-card>
+          <div class="ap">
+            <div class="ap-main">
+              <div class="row gap-2 wrap">
+                <span class="pill pill-warn">{{ p.level }} 事前确认</span>
+                <span class="t-sm c-muted">来自 {{ p.createdAt }} · {{ p.createdBy }}</span>
+              </div>
+              <h3 class="t-h3">{{ p.title }}</h3>
+              <p class="t-sm">{{ p.proposal }}</p>
+              <dl class="dl ap-dl">
+                <dt>为什么提这件事</dt>
+                <dd>{{ p.reason }}</dd>
+                <dt>会带来什么</dt>
+                <dd>{{ p.impact }}</dd>
+                <dt>风险是什么</dt>
+                <dd>{{ p.riskIfAccept }}</dd>
+                @if (p.deadline) {
+                  <dt>最晚什么时候决定</dt>
+                  <dd>{{ p.deadline }}</dd>
+                }
+              </dl>
+            </div>
+            <div class="ap-acts">
+              <button type="button" class="btn btn-accent btn-block" (click)="accept(p.id)">
+                同意这一次
+              </button>
+              <button type="button" class="btn btn-block" (click)="reject(p.id)">这次不用</button>
+              <button type="button" class="btn btn-ghost btn-block" (click)="asRule(p.id)">
+                以后都这样
+              </button>
+              <p class="t-sm c-muted ap-hint">选"以后都这样"会进入规则变更流程，涉及红线时需人工确认。</p>
+            </div>
+          </div>
+        </app-card>
+      }
+    </section>
+  }
+
+  <!-- ============ 实时能量流 ============ -->
+  <section class="grid g-2-1 power" aria-label="此刻的能量流">
+    <app-card title="此刻家里的电从哪来" [subtitle]="'数据时间 ' + store.flow.timestamp">
+      @if (load() === 'loading') {
+        <app-skeleton [lines]="5" />
+      } @else if (load() === 'empty') {
+        <app-empty
+          icon="activity"
+          title="设备刚接入，还没有采集到数据"
+          note="逆变器与电池已经连通，通常 3–5 分钟内会出现第一组读数。"
+          actionLabel="知道了"
+          (action)="reload()"
+        />
+      } @else {
+        @if (!store.flow.sourceHealthy) {
+          <div class="stale-note">
+            <app-icon name="alert" [size]="14" />
+            <span class="t-sm">{{ store.flow.sourceNote }}</span>
+          </div>
+        }
+        <ul class="flow">
+          @for (n of flowNodes(); track n.key) {
+            <li class="flow-n" [class.dim]="n.stale">
+              <div class="flow-hd">
+                <app-icon [name]="nodeIcon(n.key)" [size]="16" />
+                <span class="flow-name">{{ n.label }}</span>
+                <span class="flow-dir" [class.out]="n.direction === 'out'">
+                  {{ n.direction === 'out' ? '送出' : n.direction === 'in' ? '流入' : '静止' }}
+                </span>
+              </div>
+              <p class="flow-human">{{ n.humanReadable }}</p>
+              <p class="t-micro flow-num">{{ n.powerKw.toFixed(1) }} 度每小时</p>
+            </li>
+          }
+        </ul>
+        <p class="t-sm c-muted flow-foot">
+          我把功率换成了生活语言。如果你想知道原始读数，可以在设置里打开深水区显示。
+        </p>
+      }
+    </app-card>
+
+    <app-card title="今天我是怎么安排的" subtitle="电价是背景，动作在上面，电量在下面">
+      <div class="timeline">
+        <div class="tl-row">
+          <span class="t-micro tl-lb">电价</span>
+          <div class="tl-cv">
+            <app-chart
+              [series]="priceSeries()"
+              [height]="78"
+              [markers]="priceMarkers()"
+              ariaLabel="按 15 分钟粒度的零售电价与输配电费柱状图，标注了两条信号方向相反的时段"
+              [showLegend]="true"
+            />
+          </div>
+        </div>
+
+        <div class="tl-row">
+          <span class="t-micro tl-lb">动作</span>
+          <div class="tl-cv tl-track">
+            @for (t of tracks(); track t.id) {
+              <div
+                class="blk"
+                [class]="t.tone"
+                [style.left.%]="t.left"
+                [style.width.%]="t.width"
+                [title]="t.slot.start + '–' + t.slot.end + ' · ' + t.label"
+              >
+                <span class="blk-t">{{ t.label }}</span>
+              </div>
+            }
+            <div class="now" [style.left.%]="nowPct * 100"></div>
+          </div>
+        </div>
+
+        <div class="tl-row">
+          <span class="t-micro tl-lb">电量</span>
+          <div class="tl-cv">
+            <app-chart [series]="socSeries()" [height]="66" [showLegend]="false" ariaLabel="全天电池剩余电量变化曲线" />
+          </div>
+        </div>
+
+        <div class="tl-axis">
+          @for (l of hourLabels; track l) {
+            <span class="t-micro">{{ l }}</span>
+          }
+        </div>
+      </div>
+    </app-card>
+  </section>
+
+  <!-- ============ 今日已发生 / 待发生 ============ -->
+  <section aria-label="今天的执行明细">
+    <app-card title="今天已经做了什么，还要做什么" [subtitle]="'共 ' + plan().slots.length + ' 个时段'">
+      <div class="card-bd-tight">
+        <table class="tbl tbl-railed">
+          <thead>
+            <tr>
+              <th style="width: 104px">时段</th>
+              <th style="width: 168px">做什么</th>
+              <th style="width: 120px">电量变化</th>
+              <th>为什么</th>
+              <th style="width: 108px">状态</th>
+              <th style="width: 92px" class="r">收益影响</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (s of plan().slots; track s.id) {
+              <tr>
+                <td class="num">{{ s.start }}–{{ s.end }}</td>
+                <td>
+                  <span class="row gap-2">
+                    <span class="mk" [class]="s.action"></span>
+                    {{ s.actionLabel }}
+                  </span>
+                </td>
+                <td class="num">
+                  {{ s.socFrom }}% → {{ s.socTo }}%
+                  <span class="t-sm c-muted block">剩 {{ s.backupHoursAfter.toFixed(1) }} 小时备用</span>
+                </td>
+                <td>
+                  <p class="t-sm">{{ s.reason }}</p>
+                  @if (s.statusNote) {
+                    <p class="t-sm c-muted note">{{ s.statusNote }}</p>
+                  }
+                  @if (s.adjustedFromLabel) {
+                    <p class="t-sm c-warn note">{{ s.adjustedFromLabel }}</p>
+                  }
+                </td>
+                <td>
+                  <span class="pill pill-square" [class.pill-accent]="s.status === 'executed'" [class.pill-warn]="s.status === 'overridden' || s.status === 'revised'">
+                    {{ statusLabel(s) }}
+                  </span>
+                </td>
+                <td class="r num" [class.c-accent]="s.earningEur > 0" [class.c-danger]="s.earningEur < 0">
+                  {{ s.earningEur === 0 ? '—' : (s.earningEur > 0 ? '+' : '') + '€' + s.earningEur.toFixed(2) }}
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </app-card>
+  </section>
+
+  <!-- ============ 我主动放弃的机会 ============ -->
+  <section aria-label="我主动放弃的机会">
+    <app-card
+      title="我主动放弃的机会"
+      [subtitle]="'这一栏比已做的事更能说明我是不是算清楚了。共 ' + plan().forgone.length + ' 条'"
+    >
+      <div class="forgone">
+        @for (f of plan().forgone; track f.id) {
+          <article class="fg">
+            <div class="fg-hd">
+              <span class="pill pill-square">{{ f.window }}</span>
+              <span class="t-sm c-muted">理论上能赚 €{{ f.whatWouldHaveEarned.toFixed(2) }}</span>
+            </div>
+            <p class="t-sm fg-why">{{ f.reasonSkipped }}</p>
+            <div class="fg-ft">
+              <span class="tag">{{ reasonLabel(f.reasonKind) }}</span>
+              @if (f.userOverride) {
+                <span class="pill pill-warn pill-square">你要求执行一次</span>
+              } @else {
+                <button
+                  type="button"
+                  class="link link-accent"
+                  (click)="store.overrideForgone('today', f.id)"
+                >
+                  这一次我希望你做
+                </button>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    </app-card>
+  </section>
+
+  <!-- ============ 最近决策 ============ -->
+  <section aria-label="最近的决策">
+    <app-card title="我最近做的判断" subtitle="每一条都能点开看到完整依据，也能推翻">
+      <div actions>
+        <a class="btn btn-sm" routerLink="/decisions">全部决策日志</a>
+      </div>
+      <ul class="dec-list">
+        @for (d of decisions(); track d.id) {
+          <li class="dec">
+            <div class="dec-l">
+              <span class="t-micro dec-date">{{ d.timestamp.slice(0, 10) }}</span>
+              <p class="t-sm">{{ d.actionSummary }}</p>
+              <div class="row gap-2 wrap dec-tags">
+                <span class="tag">{{ d.actionLabel }}</span>
+                @if (d.overridden) {
+                  <span class="pill pill-warn pill-square">已被你推翻</span>
+                }
+                @if (d.takenOver) {
+                  <span class="pill pill-square">人工接管过</span>
+                }
+                @if (d.uncertaintyDeclared) {
+                  <span class="pill pill-square">我声明过不确定</span>
+                }
+              </div>
+            </div>
+            <div class="dec-r">
+              <span class="num dec-eur" [class.c-accent]="d.earningEur > 0" [class.c-danger]="d.earningEur < 0">
+                {{ d.earningEur > 0 ? '+' : '' }}€{{ d.earningEur.toFixed(2) }}
+              </span>
+              <a class="link" [routerLink]="['/decisions', d.id]">为什么</a>
+            </div>
+          </li>
+        }
+      </ul>
+    </app-card>
+  </section>
+}
